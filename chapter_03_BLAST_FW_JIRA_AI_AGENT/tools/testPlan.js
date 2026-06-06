@@ -19,7 +19,8 @@ const SCHEMA_HINT = `Return ONLY a JSON object with EXACTLY these keys:
   "exitCriteria": string[],
   "tools": string[],
   "risks": [ { "risk": string, "mitigation": string } ],
-  "approvals": [ { "role": string, "name": string } ]
+  "approvals": [ { "role": string, "name": string } ],
+  "blastPhases": { "phase1": string[], "phase2": string[] }
 }`;
 
 export function buildMessages(issue) {
@@ -32,6 +33,7 @@ export function buildMessages(issue) {
 
   const user = [
     'Create a formal Test Plan for the following Jira issue.',
+    'Use the BLAST protocol for phase 1 (Blueprint) and phase 2 (Link).',
     '',
     `Key: ${issue.key}`,
     `Summary: ${issue.summary}`,
@@ -43,6 +45,8 @@ export function buildMessages(issue) {
     '',
     'Description / Acceptance Criteria:',
     issue.description || '(none provided)',
+    '',
+    'Return BLAST phase output in the field `blastPhases` with `phase1` and `phase2` arrays of bullets.',
     '',
     SCHEMA_HINT,
   ].join('\n');
@@ -79,6 +83,10 @@ export async function generateTestPlan(config, issue) {
     tools: arr(plan.tools),
     risks: arr(plan.risks),
     approvals: arr(plan.approvals),
+    blastPhases: {
+      phase1: arr(plan.blastPhases?.phase1 || plan.phase1),
+      phase2: arr(plan.blastPhases?.phase2 || plan.phase2),
+    },
   };
 }
 
@@ -105,6 +113,10 @@ export function renderMarkdown(plan, issue) {
   L.push('## 4. Test Environments', '', ...bullets(plan.testEnvironments), '');
   L.push('## 5. Defect Reporting', '', plan.defectReporting, '');
   L.push('## 6. Test Strategy', '', ...bullets(plan.testStrategy), '');
+
+  L.push('## BLAST Phases', '');
+  L.push('**Phase 1 — Blueprint**', '', ...bullets(plan.blastPhases.phase1), '');
+  L.push('**Phase 2 — Link**', '', ...bullets(plan.blastPhases.phase2), '');
 
   L.push('## 7. Schedule', '');
   if (plan.schedule.length) {

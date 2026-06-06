@@ -4,10 +4,12 @@ import Generator from './components/Generator.jsx';
 import { getConfigStatus } from './lib/api.js';
 
 const STORAGE_KEY = 'blast.jira.config';
+const THEME_KEY = 'blast.theme';
 const emptyConfig = { jiraUrl: '', jiraEmail: '', jiraToken: '', groqKey: '' };
 
 export default function App() {
   const [tab, setTab] = useState('generate');
+  const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'dark');
   const [config, setConfig] = useState(() => {
     try {
       return { ...emptyConfig, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') };
@@ -20,6 +22,11 @@ export default function App() {
   useEffect(() => {
     getConfigStatus().then(setEnvStatus).catch(() => setEnvStatus(null));
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle('light', theme === 'light');
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   function saveConfig(next) {
     setConfig(next);
@@ -36,10 +43,15 @@ export default function App() {
             <p className="sub">B.L.A.S.T. · GROQ <code>openai/gpt-oss-120b</code></p>
           </div>
         </div>
-        <nav className="tabs">
-          <button className={tab === 'generate' ? 'active' : ''} onClick={() => setTab('generate')}>Generate</button>
-          <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
-        </nav>
+        <div className="topbar-right">
+          <nav className="tabs">
+            <button className={tab === 'generate' ? 'active' : ''} onClick={() => setTab('generate')}>Generate</button>
+            <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
+          </nav>
+          <button className="theme-toggle" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
+            {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
+        </div>
       </header>
 
       <main className="content">

@@ -50,6 +50,13 @@ export default function TestPlanView({ plan, issue, markdown }) {
       ) : (
         <div className="sections">
           <section>
+            <h4>0. BLAST Phases</h4>
+            <h5>Phase 1 — Blueprint</h5>
+            <List items={plan.blastPhases?.phase1} />
+            <h5>Phase 2 — Link</h5>
+            <List items={plan.blastPhases?.phase2} />
+          </section>
+          <section>
             <h4>1. Objective</h4>
             <p>{plan.objective}</p>
           </section>
