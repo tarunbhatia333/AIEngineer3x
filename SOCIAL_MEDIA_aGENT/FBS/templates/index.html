@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FootBro Content Agent</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <img class="header__logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="FootBro Show logo">
+      <div class="header__titles">
+        <h1 class="header__title">FOOTBRO CONTENT AGENT <span class="header__ball">⚽</span></h1>
+        <p class="header__handle">@thefootbroshow</p>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="actions">
+        <button class="action-card" id="btn-news" data-type="news">
+          <span class="action-card__icon">📰</span>
+          <span class="action-card__label">Football News</span>
+          <span class="action-card__btn">GENERATE</span>
+        </button>
+
+        <button class="action-card" id="btn-preview" data-type="preview">
+          <span class="action-card__icon">👁️</span>
+          <span class="action-card__label">Match Preview</span>
+          <span class="action-card__btn">GENERATE</span>
+        </button>
+
+        <button class="action-card" id="btn-review" data-type="review">
+          <span class="action-card__icon">📊</span>
+          <span class="action-card__label">Match Review</span>
+          <span class="action-card__btn">GENERATE</span>
+        </button>
+      </section>
+
+      <section class="custom">
+        <h2 class="custom__title">✏️ Custom Content</h2>
+        <textarea
+          id="custom-input"
+          class="custom__input"
+          placeholder="Type anything football... e.g. 'Write a post about the Ronaldo vs Messi GOAT debate'"
+          rows="3"
+        ></textarea>
+        <button class="custom__btn" id="btn-custom">GENERATE CONTENT</button>
+      </section>
+
+      <section class="output" id="output" hidden>
+        <div class="output__spinner" id="spinner" hidden>
+          <div class="ball-spinner">⚽</div>
+          <p>Generating your post...</p>
+        </div>
+
+        <div class="output__error" id="error-box" hidden></div>
+
+        <div class="output__prompt-box" id="prompt-box" hidden>
+          <h3>📋 COPY THIS PROMPT</h3>
+          <p class="output__prompt-hint">
+            Paste this into ChatGPT, Gemini, or any AI chat to get the image prompt,
+            caption, stats bullets and hashtags yourself.
+          </p>
+          <textarea id="prompt-text" class="output__prompt-text" readonly rows="10"></textarea>
+          <button type="button" class="btn btn--gold output__copy-btn" id="copy-prompt-btn" data-target="prompt-text">📋 COPY PROMPT</button>
+        </div>
+
+        <div class="output__content" id="output-content" hidden>
+          <div class="output__image-wrap">
+            <img id="output-image" class="output__image" alt="Generated Instagram post preview">
+          </div>
+          <div class="output__details">
+            <div class="output__note" id="output-note" hidden></div>
+
+            <h3>📝 CAPTION</h3>
+            <p id="output-caption" class="output__caption"></p>
+
+            <h3>#️⃣ HASHTAGS</h3>
+            <p id="output-hashtags" class="output__hashtags"></p>
+
+            <div class="output__prompt-box output__prompt-box--inline" id="image-prompt-box" hidden>
+              <h3>🖼️ IMAGE PROMPT</h3>
+              <p class="output__prompt-hint">
+                AI image quota reached — paste this prompt into ChatGPT, Gemini or DALL-E to
+                generate the image yourself.
+              </p>
+              <textarea id="image-prompt-text" class="output__prompt-text" readonly rows="4"></textarea>
+              <button type="button" class="btn btn--gold output__copy-btn" id="copy-image-prompt-btn" data-target="image-prompt-text">📋 COPY IMAGE PROMPT</button>
+            </div>
+
+            <div class="output__downloads">
+              <a id="download-image" class="btn btn--gold" download>⬇ DOWNLOAD IMAGE</a>
+              <a id="download-text" class="btn btn--green" download>⬇ DOWNLOAD CAPTION+TAGS</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="output__prompt-box" id="logs-box" hidden>
+          <h3>🪵 ERROR / DEBUG LOGS</h3>
+          <p class="output__prompt-hint">
+            Details from the AI providers for this generation — copy and share if you need help debugging.
+          </p>
+          <textarea id="logs-text" class="output__prompt-text" readonly rows="6"></textarea>
+          <button type="button" class="btn btn--gold output__copy-btn" id="copy-logs-btn" data-target="logs-text">📋 COPY LOGS</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>The FootBro Show | @thefootbroshow — Football conversations. Real opinions. For fans, by fans. ⚽</p>
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
