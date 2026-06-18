@@ -82,6 +82,8 @@ function showResult(data) {
   outputContent.hidden = false;
 
   showLogs(data.logs);
+
+  output.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function setupCopyButton(button) {
@@ -134,16 +136,119 @@ async function generate(endpoint, body) {
   }
 }
 
-document.getElementById("btn-news").addEventListener("click", () => {
-  generate("/generate/news");
-});
+// ---------------------------------------------------------------------------
+// Two-step selection flow: News / Match Preview / Match Review
+// ---------------------------------------------------------------------------
 
-document.getElementById("btn-preview").addEventListener("click", () => {
-  generate("/generate/preview");
-});
+const SECTIONS = ["news", "preview", "review"];
+const AUTO_REFRESH_MS = 60 * 60 * 1000; // 1 hour
 
-document.getElementById("btn-review").addEventListener("click", () => {
-  generate("/generate/review");
+function cardMeta(section, option) {
+  if (section === "news") {
+    return { icon: "📰", title: option.headline, meta: `${option.source} · ${option.time_ago}` };
+  }
+  if (section === "preview") {
+    return {
+      icon: "⚽",
+      title: `${option.home_team} vs ${option.away_team}`,
+      meta: `${option.competition} · ${option.kickoff}`,
+    };
+  }
+  return {
+    icon: "📊",
+    title: `${option.home_team} ${option.score} ${option.away_team}`,
+    meta: option.competition,
+  };
+}
+
+function renderSkeletons(section) {
+  const cardsEl = document.getElementById(`options-${section}-cards`);
+  cardsEl.innerHTML = "";
+  for (let i = 0; i < 3; i++) {
+    const skeleton = document.createElement("div");
+    skeleton.className = "skeleton-card";
+    cardsEl.appendChild(skeleton);
+  }
+}
+
+function renderOptions(section, options) {
+  const cardsEl = document.getElementById(`options-${section}-cards`);
+  cardsEl.innerHTML = "";
+
+  if (!options.length) {
+    const empty = document.createElement("p");
+    empty.className = "options-panel__empty";
+    empty.textContent = "No trending items right now — try refreshing.";
+    cardsEl.appendChild(empty);
+    return;
+  }
+
+  options.forEach((option) => {
+    const { icon, title, meta } = cardMeta(section, option);
+    const card = document.createElement("div");
+    card.className = "option-card";
+    card.innerHTML = `
+      <div class="option-card__icon">${icon}</div>
+      <div class="option-card__headline">${title}</div>
+      <div class="option-card__meta">${meta}</div>
+      <button type="button" class="option-card__select btn btn--gold">SELECT →</button>
+    `;
+    card.querySelector(".option-card__select").addEventListener("click", () => {
+      generate(`/generate/${section}/${option.id}`);
+    });
+    cardsEl.appendChild(card);
+  });
+}
+
+function formatUpdated(lastUpdated) {
+  const seconds = Math.max((Date.now() / 1000) - lastUpdated, 0);
+  if (seconds < 60) return "Updated just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `Updated ${minutes} min${minutes !== 1 ? "s" : ""} ago`;
+  const hours = Math.round(minutes / 60);
+  return `Updated ${hours} hour${hours !== 1 ? "s" : ""} ago`;
+}
+
+async function loadOptions(section, { force = false, showSkeletons = true } = {}) {
+  const panel = document.getElementById(`options-${section}`);
+  panel.hidden = false;
+
+  if (showSkeletons) {
+    renderSkeletons(section);
+  }
+
+  try {
+    const response = await fetch(`/fetch-options/${section}${force ? "?force=true" : ""}`);
+    const data = await response.json();
+    if (!response.ok) {
+      renderOptions(section, []);
+      return;
+    }
+    renderOptions(section, data.options || []);
+    document.getElementById(`options-${section}-updated`).textContent = formatUpdated(data.last_updated);
+  } catch (err) {
+    renderOptions(section, []);
+  }
+}
+
+SECTIONS.forEach((section) => {
+  document.getElementById(`btn-${section}`).addEventListener("click", () => {
+    loadOptions(section, { force: false, showSkeletons: true });
+  });
+
+  const refreshBtn = document.getElementById(`refresh-${section}`);
+  refreshBtn.addEventListener("click", async () => {
+    refreshBtn.classList.add("refresh-icon--spinning");
+    await loadOptions(section, { force: true, showSkeletons: false });
+    refreshBtn.classList.remove("refresh-icon--spinning");
+  });
+
+  setInterval(() => {
+    const panel = document.getElementById(`options-${section}`);
+    if (!panel.hidden) {
+      loadOptions(section, { force: true, showSkeletons: false });
+    }
+  }, AUTO_REFRESH_MS);
 });
 
 document.getElementById("btn-custom").addEventListener("click", () => {

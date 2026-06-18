@@ -1,12 +1,17 @@
 """Recently completed match -> match review Instagram post content generator."""
-from agents import IMAGE_PROMPT_GUIDELINES
+from agents import FULL_GRAPHIC_GUIDELINES
 from scrapers.football_scraper import get_recent_results
 
 
-def build_prompt():
-    """Fetch a recently completed match and build the GPT user prompt for it."""
-    results = get_recent_results()
-    result = results[0] if results else None
+def build_prompt(result=None):
+    """Build the GPT user prompt for a match review.
+
+    Uses the given pre-fetched `result` (e.g. a user-selected option) if
+    provided, otherwise fetches a recently completed match itself.
+    """
+    if result is None:
+        results = get_recent_results()
+        result = results[0] if results else None
 
     if result:
         score = f"{result['home_score']} - {result['away_score']}"
@@ -38,15 +43,19 @@ def build_prompt():
 Generate:
 1. A punchy IMAGE HEADLINE — a short, bold breaking-news-style hook (4-8 words, ALL CAPS, no emojis) themed around the result, e.g. "BARCELONA DEMOLISH REAL MADRID 4-0"
 2. Instagram CAPTION — reaction-style, fan voice, hot take, 150 words max
-3. Stats bullets for image (up to 5 bullets, each grounded in the real result details above — never invent a stat that isn't given)
-4. DALL-E image prompt (post-match celebration or drama, {IMAGE_PROMPT_GUIDELINES})
-5. Top 5 hashtags
+3. Exactly 4 KEY STATS bullets — grounded in the real result details above only. Never invent a stat not given.
+4. Exactly 4 FUN FACTS — verified trivia or context about these teams, the competition, or the result's significance. Start each with a relevant emoji (⚽ 🏆 🔥 📊 🎯 ⭐ 🏟️ etc.). Must be accurate.
+5. A FULL GRAPHIC IMAGE PROMPT for gpt-image-1 that bakes the result headline
+   and key stats bullets directly into the image as on-image text/graphics,
+   with a post-match celebration or drama feel. {FULL_GRAPHIC_GUIDELINES}
+6. Top 5 hashtags
 
 Respond in JSON:
 {{
   "headline": "...",
   "caption": "...",
-  "stats_bullets": ["• Bullet 1", "• Bullet 2", "• Bullet 3", "• Bullet 4", "• Bullet 5"],
+  "stats_bullets": ["• Bullet 1", "• Bullet 2", "• Bullet 3", "• Bullet 4"],
+  "fun_facts": ["⚽ ...", "🏆 ...", "🔥 ...", "📊 ..."],
   "image_prompt": "...",
   "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"]
 }}"""

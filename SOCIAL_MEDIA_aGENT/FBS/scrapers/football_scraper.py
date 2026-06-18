@@ -5,7 +5,9 @@ ESPN's public scoreboard JSON endpoints for the top European/world leagues.
 All functions fail soft — on any network/parse error they return an empty
 list so agents can fall back to GPT's own knowledge.
 """
+import calendar
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 import feedparser
 import requests
@@ -197,3 +199,31 @@ def _extract_entry_image(entry):
     if "media_thumbnail" in entry and entry.media_thumbnail:
         return entry.media_thumbnail[0].get("url", "")
     return ""
+
+
+def _time_ago(published_parsed):
+    """Format an RSS `published_parsed` struct_time as e.g. '2 hours ago'."""
+    if not published_parsed:
+        return "recently"
+
+    published = datetime.utcfromtimestamp(calendar.timegm(published_parsed))
+    seconds = max((datetime.utcnow() - published).total_seconds(), 0)
+
+    if seconds < 60:
+        return "just now"
+    minutes = int(seconds // 60)
+    if minutes < 60:
+        return f"{minutes} min{'s' if minutes != 1 else ''} ago"
+    hours = int(minutes // 60)
+    if hours < 24:
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    days = int(hours // 24)
+    return f"{days} day{'s' if days != 1 else ''} ago"
+
+
+def _source_name(url):
+    """Derive a display source name (e.g. 'Goal.com') from an article URL."""
+    if not url:
+        return "Unknown source"
+    host = urlparse(url).netloc.replace("www.", "")
+    return host or "Unknown source"

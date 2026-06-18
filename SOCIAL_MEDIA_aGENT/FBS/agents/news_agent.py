@@ -1,11 +1,16 @@
 """Football news -> Instagram post content generator."""
-from agents import IMAGE_PROMPT_GUIDELINES
+from agents import FULL_GRAPHIC_GUIDELINES
 from scrapers.football_scraper import get_top_story
 
 
-def build_prompt():
-    """Scrape the top trending football story and build the GPT user prompt for it."""
-    story = get_top_story()
+def build_prompt(story=None):
+    """Build the GPT user prompt for a football news story.
+
+    Uses the given pre-fetched `story` (e.g. a user-selected option) if
+    provided, otherwise scrapes the top trending story itself.
+    """
+    if story is None:
+        story = get_top_story()
 
     if story:
         headline = story["headline"]
@@ -35,15 +40,19 @@ SUMMARY: {summary}{data_note}
 Generate:
 1. A punchy IMAGE HEADLINE — a short, bold breaking-news-style hook (4-8 words, ALL CAPS, no emojis) that will be displayed in huge letters on the post image, e.g. "NEYMAR'S FINAL WORLD CUP?"
 2. A SHORT Instagram CAPTION (max 150 words) — punchy, fan-friendly, opinionated. Add 1-2 emojis per line. End with a CTA like "Drop your thoughts below \U0001F447" or "Agree? Let us know \U0001F525"
-3. An IMAGE GENERATION PROMPT for DALL-E 3 (detailed, vivid, {IMAGE_PROMPT_GUIDELINES})
-4. A bullet point block (up to 5 short bullets, each one a fact stated in the SUMMARY above — never invent a stat that isn't in it)
-5. Top 5 SEO hashtags for football Instagram (mix of broad + niche)
+3. A FULL GRAPHIC IMAGE PROMPT for gpt-image-1 that bakes the headline and the
+   key stats bullets below directly into the image as on-image text/graphics.
+   {FULL_GRAPHIC_GUIDELINES}
+4. Exactly 4 KEY STATS bullets — short, factual, sourced from the SUMMARY above only. No invented stats.
+5. Exactly 4 FUN FACTS — verified football trivia, historical context, or interesting facts about the players/clubs/competition in this story. Start each with a relevant emoji (⚽ 🏆 🔥 📊 🎯 ⭐ 🏟️). Must be accurate.
+6. Top 5 SEO hashtags for football Instagram (mix of broad + niche)
 
 Respond in JSON format:
 {{
   "headline": "...",
   "caption": "...",
   "image_prompt": "...",
-  "stats_bullets": ["• ...", "• ...", "• ...", "• ...", "• ..."],
+  "stats_bullets": ["• ...", "• ...", "• ...", "• ..."],
+  "fun_facts": ["⚽ ...", "🏆 ...", "🔥 ...", "📊 ..."],
   "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"]
 }}"""

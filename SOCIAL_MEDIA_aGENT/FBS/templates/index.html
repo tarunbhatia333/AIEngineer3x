@@ -19,23 +19,50 @@
 
     <main class="main">
       <section class="actions">
-        <button class="action-card" id="btn-news" data-type="news">
-          <span class="action-card__icon">📰</span>
-          <span class="action-card__label">Football News</span>
-          <span class="action-card__btn">GENERATE</span>
-        </button>
+        <div class="action-block">
+          <button class="action-card" id="btn-news" data-section="news">
+            <span class="action-card__icon">📰</span>
+            <span class="action-card__label">Football News</span>
+            <span class="action-card__btn">GENERATE</span>
+          </button>
+          <div class="options-panel" id="options-news" data-section="news" hidden>
+            <div class="options-panel__header">
+              <span class="options-panel__updated" id="options-news-updated">Updated just now</span>
+              <button type="button" class="refresh-icon" id="refresh-news" data-section="news" aria-label="Refresh options">🔄</button>
+            </div>
+            <div class="options-panel__cards" id="options-news-cards"></div>
+          </div>
+        </div>
 
-        <button class="action-card" id="btn-preview" data-type="preview">
-          <span class="action-card__icon">👁️</span>
-          <span class="action-card__label">Match Preview</span>
-          <span class="action-card__btn">GENERATE</span>
-        </button>
+        <div class="action-block">
+          <button class="action-card" id="btn-preview" data-section="preview">
+            <span class="action-card__icon">👁️</span>
+            <span class="action-card__label">Match Preview</span>
+            <span class="action-card__btn">GENERATE</span>
+          </button>
+          <div class="options-panel" id="options-preview" data-section="preview" hidden>
+            <div class="options-panel__header">
+              <span class="options-panel__updated" id="options-preview-updated">Updated just now</span>
+              <button type="button" class="refresh-icon" id="refresh-preview" data-section="preview" aria-label="Refresh options">🔄</button>
+            </div>
+            <div class="options-panel__cards" id="options-preview-cards"></div>
+          </div>
+        </div>
 
-        <button class="action-card" id="btn-review" data-type="review">
-          <span class="action-card__icon">📊</span>
-          <span class="action-card__label">Match Review</span>
-          <span class="action-card__btn">GENERATE</span>
-        </button>
+        <div class="action-block">
+          <button class="action-card" id="btn-review" data-section="review">
+            <span class="action-card__icon">📊</span>
+            <span class="action-card__label">Match Review</span>
+            <span class="action-card__btn">GENERATE</span>
+          </button>
+          <div class="options-panel" id="options-review" data-section="review" hidden>
+            <div class="options-panel__header">
+              <span class="options-panel__updated" id="options-review-updated">Updated just now</span>
+              <button type="button" class="refresh-icon" id="refresh-review" data-section="review" aria-label="Refresh options">🔄</button>
+            </div>
+            <div class="options-panel__cards" id="options-review-cards"></div>
+          </div>
+        </div>
       </section>
 
       <section class="custom">

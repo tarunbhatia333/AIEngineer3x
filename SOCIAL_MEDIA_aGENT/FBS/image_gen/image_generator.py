@@ -34,13 +34,14 @@ def get_client():
     return _client
 
 
-def generate_image(prompt, size="1536x1024", quality="medium", logs=None):
+def generate_image(prompt, size="1024x1536", quality="high", logs=None):
     """Generate an image for the given prompt.
 
-    Uses a wide landscape gpt-image-1 size so the result can be cropped to
-    the top portion of a 1080x1350 (4:5) Instagram post. Falls back to
-    Gemini on an OpenAI rate limit / quota error. If `logs` is a list,
-    detailed provider error info is appended to it for display/debugging.
+    Uses a portrait gpt-image-1 size close to the 1080x1350 (4:5) Instagram
+    post ratio, since the image is now expected to be a fully-finished
+    graphic (not just a top-of-post photo). Falls back to Gemini on an
+    OpenAI rate limit / quota error. If `logs` is a list, detailed provider
+    error info is appended to it for display/debugging.
     """
     try:
         client = get_client()
@@ -52,14 +53,26 @@ def generate_image(prompt, size="1536x1024", quality="medium", logs=None):
             n=1,
         )
         return base64.b64decode(response.data[0].b64_json)
-    except openai.RateLimitError as exc:
+    except (openai.RateLimitError, openai.BadRequestError) as exc:
+        error_code = getattr(getattr(exc, "body", None) or {}, "get", lambda *a: None)("error", {})
+        is_moderation = (
+            isinstance(exc, openai.BadRequestError)
+            and isinstance(exc.body, dict)
+            and exc.body.get("error", {}).get("code") == "moderation_blocked"
+        )
         _log(logs, f"Image generation (gpt-image-1): {_format_openai_error(exc)}")
         if not os.environ.get("GEMINI_API_KEY"):
+            if is_moderation:
+                raise RuntimeError(
+                    "Image prompt was blocked by OpenAI content moderation. "
+                    "Try a different topic."
+                ) from exc
             raise QuotaExceededError(QUOTA_EXCEEDED_MESSAGE) from exc
 
         from google.genai import errors as genai_errors
 
-        _log(logs, f"Falling back to Gemini ({GEMINI_IMAGE_MODEL}) for image generation...")
+        reason = "content moderation block" if is_moderation else "rate limit"
+        _log(logs, f"Falling back to Gemini ({GEMINI_IMAGE_MODEL}) due to {reason}...")
         try:
             return _generate_image_gemini(prompt)
         except genai_errors.ClientError as gexc:
