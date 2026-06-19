@@ -1,13 +1,19 @@
 ---
 name: content-gen-app
-description: Blueprint for building a one-click social/content generation web app (Flask + GPT + image model) for any topic and any platform — e.g. football Instagram posts (FootBro Show, reference implementation), LinkedIn thought-leadership posts, Medium articles, Twitter/X threads. Use when the user wants to scaffold or extend a "pick a real source item -> auto-generate branded post" tool.
+description: Blueprint for building a one-click social/content generation web app (Flask + GPT + image model) for any topic and any platform — e.g. football Instagram posts (FootBro Show, reference implementation), QA/test-automation LinkedIn + Medium posts (QA Content Agent, second reference implementation), Twitter/X threads. Use when the user wants to scaffold or extend a "pick a real source item -> auto-generate branded post" tool.
 ---
 
 # Content-Gen App Blueprint
 
-Reference implementation: `SOCIAL_MEDIA_aGENT/FBS` (football news -> Instagram
-posts for @thefootbroshow). Copy this architecture, swap the **domain knobs** in the table
-below, and the same app works for a different topic/platform.
+Reference implementations:
+- `SOCIAL_MEDIA_aGENT/FBS` (football news -> Instagram posts for @thefootbroshow)
+- `QAProject/QAProject/QA_content_creator` (QA/automation news -> LinkedIn posts + Medium
+  articles, deployed at https://qa-content-agent.vercel.app — see its `SKILL.md` for the
+  as-built writeup, including a 3-tier image fallback chain and serverless-specific
+  adaptations like inline base64 images instead of disk persistence)
+
+Copy this architecture, swap the **domain knobs** in the table below, and the same app
+works for a different topic/platform.
 
 ## Core architecture (always the same 5 pieces)
 
