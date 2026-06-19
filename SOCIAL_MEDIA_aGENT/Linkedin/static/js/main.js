@@ -120,6 +120,7 @@ function renderResult(section, data) {
     <div class="output__content">
       <div class="output__image-wrap">
         <img class="output__image" src="${data.image_url}" alt="Generated ${section} preview">
+        <p class="output__image-provider">Image generated via: ${escapeHtml(data.image_provider || "unknown")}</p>
       </div>
       <div class="output__details">
         ${bodyHtml}
@@ -214,6 +215,8 @@ async function generateFromCustom(section) {
   }
 }
 
+const referenceUploadHandlers = {};
+
 function setupReferenceUpload(section) {
   const fileInput = el(`custom-image-${section}`);
   const dropZone = el(`custom-image-${section}-drop`);
@@ -231,6 +234,8 @@ function setupReferenceUpload(section) {
     preview.querySelector("img").src = await readFileAsDataUrl(file);
     preview.hidden = false;
   }
+
+  referenceUploadHandlers[section] = showFile;
 
   fileInput.addEventListener("change", () => showFile(fileInput.files[0]));
 
@@ -256,13 +261,22 @@ function setupReferenceUpload(section) {
       const file = e.dataTransfer.files && e.dataTransfer.files[0];
       if (file) showFile(file);
     });
-
-    dropZone.addEventListener("paste", (e) => {
-      const item = Array.from(e.clipboardData.items || []).find((i) => i.type.startsWith("image/"));
-      if (item) showFile(item.getAsFile());
-    });
   }
 }
+
+// Paste only fires on whichever element actually has focus, and that's
+// often the textarea or the file-input button rather than the drop zone
+// div itself — so listen at the document level and route by which
+// platform section currently has focus, instead of binding to one element.
+document.addEventListener("paste", (e) => {
+  const platform = document.activeElement && document.activeElement.closest(".platform");
+  if (!platform) return;
+  const handler = referenceUploadHandlers[platform.dataset.section];
+  if (!handler) return;
+
+  const item = Array.from(e.clipboardData?.items || []).find((i) => i.type.startsWith("image/"));
+  if (item) handler(item.getAsFile());
+});
 
 SECTIONS.forEach((section) => {
   el(`btn-${section}`).addEventListener("click", () => fetchOptions(section, false));

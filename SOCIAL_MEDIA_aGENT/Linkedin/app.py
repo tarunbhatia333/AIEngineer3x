@@ -134,11 +134,12 @@ def _generate(section, user_prompt, reference_image=None):
     image_size = "1024x1536" if section == "linkedin" else "1536x1024"
 
     ai_image_source = None
+    image_provider = "Placeholder (PIL-generated — no AI provider produced an image)"
     note = None
     manual_image_prompt = None
     if image_prompt:
         try:
-            ai_image_source = generate_image(
+            ai_image_source, image_provider = generate_image(
                 image_prompt, reference_image=reference_image, size=image_size, logs=logs
             )
         except QuotaExceededError:
@@ -188,6 +189,7 @@ def _generate(section, user_prompt, reference_image=None):
         "text_filename": f"qca_{section}_{timestamp}.txt",
         "text_body": text_body,
         "image_generated": ai_image_source is not None,
+        "image_provider": image_provider,
         "note": note,
         "manual_image_prompt": manual_image_prompt,
         "logs": logs,

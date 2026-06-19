@@ -190,6 +190,12 @@ body {
 }
 .custom__upload-preview[hidden] { display: none; }
 
+.custom__upload-confirm {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6fcf97;
+}
+
 .custom__upload-drop {
   margin-top: 8px;
   border: 1px dashed var(--border);
@@ -263,6 +269,7 @@ body {
 .output__content { display: flex; gap: 20px; flex-wrap: wrap; }
 .output__image-wrap { flex: 0 0 260px; }
 .output__image { width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+.output__image-provider { font-size: 11px; color: var(--gray); margin: 8px 0 0; }
 .output__details { flex: 1; min-width: 260px; }
 
 .output__details h3 {

@@ -49,11 +49,15 @@ def generate_image(prompt, reference_image=None, size="1024x1536", quality="high
     image bytes used as a visual base (see module docstring). If `logs` is
     a list, detailed provider error info is appended to it for
     display/debugging.
+
+    Returns a tuple `(image_bytes, provider_label)` — `provider_label` says
+    which API actually produced the image (OpenAI -> Gemini -> Hugging
+    Face, in that order), so the caller can show it to the user.
     """
     if reference_image:
-        image = _generate_with_reference(prompt, reference_image, size, quality, logs)
-        if image:
-            return image
+        result = _generate_with_reference(prompt, reference_image, size, quality, logs)
+        if result:
+            return result
         _log(logs, "Reference image isn't supported by the remaining providers — continuing with text-only generation.")
 
     try:
@@ -65,7 +69,7 @@ def generate_image(prompt, reference_image=None, size="1024x1536", quality="high
             quality=quality,
             n=1,
         )
-        return base64.b64decode(response.data[0].b64_json)
+        return base64.b64decode(response.data[0].b64_json), "OpenAI (gpt-image-1)"
     except (openai.RateLimitError, openai.BadRequestError) as exc:
         is_moderation = (
             isinstance(exc, openai.BadRequestError)
@@ -94,13 +98,14 @@ def _generate_with_reference(prompt, reference_image, size, quality, logs):
             size=size,
             quality=quality,
         )
-        return base64.b64decode(response.data[0].b64_json)
+        return base64.b64decode(response.data[0].b64_json), "OpenAI (gpt-image-1 edit, with your reference image)"
     except Exception as exc:
         _log(logs, f"Image edit (gpt-image-1, with reference image): {exc}")
 
     if os.environ.get("GEMINI_API_KEY"):
         try:
-            return _generate_image_gemini(prompt, reference_image=reference_image)
+            image = _generate_image_gemini(prompt, reference_image=reference_image)
+            return image, "Gemini (gemini-2.5-flash-image, with your reference image)"
         except Exception as exc:
             _log(logs, f"Image generation ({GEMINI_IMAGE_MODEL}, with reference image): {exc}")
 
@@ -112,14 +117,14 @@ def _fallback_chain(prompt, logs):
     if os.environ.get("GEMINI_API_KEY"):
         _log(logs, f"Falling back to Gemini ({GEMINI_IMAGE_MODEL}) due to rate limit...")
         try:
-            return _generate_image_gemini(prompt)
+            return _generate_image_gemini(prompt), f"Gemini ({GEMINI_IMAGE_MODEL})"
         except Exception as exc:
             _log(logs, f"Image generation ({GEMINI_IMAGE_MODEL}): {exc}")
 
     if os.environ.get("HUGGINGFACE_API_KEY"):
         _log(logs, f"Falling back to Hugging Face ({HF_IMAGE_MODEL})...")
         try:
-            return _generate_image_huggingface(prompt)
+            return _generate_image_huggingface(prompt), f"Hugging Face ({HF_IMAGE_MODEL})"
         except Exception as exc:
             _log(logs, f"Image generation ({HF_IMAGE_MODEL} via Hugging Face): {exc}")
 
