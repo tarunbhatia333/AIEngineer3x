@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QA Content Agent</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header__bar"></div>
+      <div class="header__titles">
+        <h1 class="header__title">QA CONTENT AGENT</h1>
+        <p class="header__sub">QA · Test Automation · AI Agents · Vibe Coding · n8n</p>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- ===================== LinkedIn section ===================== -->
+      <section class="platform" data-section="linkedin">
+        <div class="platform__head">
+          <h2 class="platform__title">LinkedIn Post</h2>
+          <button class="platform__btn" id="btn-linkedin" data-section="linkedin">GENERATE</button>
+        </div>
+
+        <div class="options-panel" id="options-linkedin" hidden>
+          <div class="options-panel__header">
+            <span class="options-panel__updated" id="options-linkedin-updated">Updated just now</span>
+            <button type="button" class="refresh-icon" id="refresh-linkedin" data-section="linkedin" aria-label="Refresh options">&#x21bb;</button>
+          </div>
+          <div class="options-panel__cards" id="options-linkedin-cards"></div>
+        </div>
+
+        <div class="custom">
+          <textarea
+            id="custom-input-linkedin"
+            class="custom__input"
+            placeholder="Or type a custom QA/automation topic for a LinkedIn post..."
+            rows="2"
+          ></textarea>
+          <div class="custom__upload">
+            <label class="custom__upload-label" for="custom-image-linkedin">
+              Reference image (optional) — used as a visual base for the generated graphic
+            </label>
+            <div class="custom__upload-drop" id="custom-image-linkedin-drop" tabindex="0">
+              Drag &amp; drop, paste (Ctrl+V), or
+              <input type="file" id="custom-image-linkedin" class="custom__upload-input" accept="image/*">
+            </div>
+            <div class="custom__upload-preview" id="custom-image-linkedin-preview" hidden>
+              <img alt="Reference preview">
+              <button type="button" class="custom__upload-clear" id="custom-image-linkedin-clear">&times;</button>
+            </div>
+          </div>
+          <button class="custom__btn" id="btn-custom-linkedin" data-section="linkedin">GENERATE FROM TOPIC</button>
+        </div>
+
+        <div class="output" id="output-linkedin" data-section="linkedin" hidden></div>
+      </section>
+
+      <!-- ===================== Medium section ===================== -->
+      <section class="platform" data-section="medium">
+        <div class="platform__head">
+          <h2 class="platform__title">Medium Article</h2>
+          <button class="platform__btn" id="btn-medium" data-section="medium">GENERATE</button>
+        </div>
+
+        <div class="options-panel" id="options-medium" hidden>
+          <div class="options-panel__header">
+            <span class="options-panel__updated" id="options-medium-updated">Updated just now</span>
+            <button type="button" class="refresh-icon" id="refresh-medium" data-section="medium" aria-label="Refresh options">&#x21bb;</button>
+          </div>
+          <div class="options-panel__cards" id="options-medium-cards"></div>
+        </div>
+
+        <div class="custom">
+          <textarea
+            id="custom-input-medium"
+            class="custom__input"
+            placeholder="Or type a custom QA/automation topic for a Medium article..."
+            rows="2"
+          ></textarea>
+          <div class="custom__upload">
+            <label class="custom__upload-label" for="custom-image-medium">
+              Reference image (optional) — used as a visual base for the generated cover
+            </label>
+            <div class="custom__upload-drop" id="custom-image-medium-drop" tabindex="0">
+              Drag &amp; drop, paste (Ctrl+V), or
+              <input type="file" id="custom-image-medium" class="custom__upload-input" accept="image/*">
+            </div>
+            <div class="custom__upload-preview" id="custom-image-medium-preview" hidden>
+              <img alt="Reference preview">
+              <button type="button" class="custom__upload-clear" id="custom-image-medium-clear">&times;</button>
+            </div>
+          </div>
+          <button class="custom__btn" id="btn-custom-medium" data-section="medium">GENERATE FROM TOPIC</button>
+        </div>
+
+        <div class="output" id="output-medium" data-section="medium" hidden></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>QA Content Agent — branded LinkedIn posts &amp; Medium articles for QA/automation practitioners.</p>
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
