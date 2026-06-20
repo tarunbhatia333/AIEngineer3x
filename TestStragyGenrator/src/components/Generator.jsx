@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import { generatePlan, savePlan } from '../lib/api.js';
 import TestPlanView from './TestPlanView.jsx';
+import TicketSourceToggle from './TicketSourceToggle.jsx';
 
-export default function Generator({ config, envStatus, goSettings }) {
-  const [jiraId, setJiraId] = useState('VWO-48');
+export default function Generator({
+  config, envStatus, goSettings, goPicker,
+  dataSource, onDataSourceChange, jiraId, onJiraIdChange,
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [savedPath, setSavedPath] = useState('');
 
   const hasJira =
-    (config.jiraUrl || envStatus?.jiraUrl) &&
-    (config.jiraEmail || envStatus?.jiraEmail) &&
-    (config.jiraToken || envStatus?.hasJiraToken);
-  const hasGroq = config.groqKey || envStatus?.hasGroqKey;
-  const ready = Boolean(hasJira && hasGroq);
+    dataSource === 'azure'
+      ? Boolean(config.azure?.orgUrl && config.azure?.project && config.azure?.pat)
+      : (config.jiraUrl || envStatus?.jiraUrl) && (config.jiraEmail || envStatus?.jiraEmail) && (config.jiraToken || envStatus?.hasJiraToken);
+  const hasLlmKey = Boolean(envStatus?.providers?.[envStatus?.activeProvider] || config?.llm?.[config?.llm?.active]?.key);
+  const ready = Boolean(hasJira && hasLlmKey);
 
   async function onGenerate(e) {
     e.preventDefault();
@@ -23,7 +26,7 @@ export default function Generator({ config, envStatus, goSettings }) {
     setSavedPath('');
     setLoading(true);
     try {
-      const data = await generatePlan(jiraId.trim(), config);
+      const data = await generatePlan(jiraId.trim(), { ...config, dataSource });
       setResult(data);
     } catch (err) {
       setError(err.message);
@@ -54,7 +57,10 @@ export default function Generator({ config, envStatus, goSettings }) {
 
   return (
     <section className="card">
-      <h2>Generate Test Plan</h2>
+      <div className="plan-head">
+        <h2>Generate Test Plan</h2>
+        <button className="link" onClick={goPicker}>Change mode</button>
+      </div>
 
       {!ready && (
         <div className="warn">
@@ -63,20 +69,21 @@ export default function Generator({ config, envStatus, goSettings }) {
         </div>
       )}
 
-      <form onSubmit={onGenerate} className="genrow">
-        <input
-          className="jira-input"
-          value={jiraId}
-          onChange={(e) => setJiraId(e.target.value)}
-          placeholder="VWO-48"
-          spellCheck="false"
+      <form onSubmit={onGenerate} className="form">
+        <TicketSourceToggle
+          dataSource={dataSource}
+          onDataSourceChange={onDataSourceChange}
+          ticketId={jiraId}
+          onTicketIdChange={onJiraIdChange}
         />
-        <button type="submit" className="primary" disabled={loading || !jiraId.trim()}>
-          {loading ? 'Generating…' : 'Generate'}
-        </button>
+        <div className="row">
+          <button type="submit" className="primary" disabled={loading || !jiraId.trim()}>
+            {loading ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
       </form>
 
-      {loading && <div className="loader">Fetching issue + asking GROQ…</div>}
+      {loading && <div className="loader">Fetching issue + asking the LLM…</div>}
       {error && <div className="error">⚠ {error}</div>}
 
       {result && (

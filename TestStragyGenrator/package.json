@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "BLAST: lightweight React + Express app that turns a Jira ID into a formal QA Test Plan via GROQ.",
+  "description": "E2E TestCase Generator: lightweight React + Express app that turns a Jira/Azure DevOps ticket into a Test Plan, Test Cases, or Selenium Test Scripts via your choice of LLM.",
   "scripts": {
     "dev": "concurrently -k -n SERVER,CLIENT -c blue,green \"node server.js\" \"vite\"",
     "server": "node server.js",
@@ -15,8 +15,12 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "jszip": "^3.10.1",
+    "papaparse": "^5.4.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-syntax-highlighter": "^15.5.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

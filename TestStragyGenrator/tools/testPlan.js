@@ -1,6 +1,6 @@
 // Layer 3 Tool — build the prompt, generate the plan via GROQ, render deterministic Markdown.
 // Boundary rule (BLAST): GROQ produces CONTENT (JSON); Markdown rendering is deterministic code.
-import { groqChat } from './groqClient.js';
+import { chat } from './llmClient.js';
 
 const SCHEMA_HINT = `Return ONLY a JSON object with EXACTLY these keys:
 {
@@ -60,7 +60,7 @@ export function buildMessages(issue) {
 const arr = (v) => (Array.isArray(v) ? v : []);
 
 export async function generateTestPlan(config, issue) {
-  const plan = await groqChat(config, buildMessages(issue), { json: true, temperature: 0.3 });
+  const plan = await chat(config, buildMessages(issue), { json: true, temperature: 0.3 });
 
   // Defensive normalization so the renderer never crashes on a missing key.
   return {
@@ -95,7 +95,7 @@ function bullets(list) {
   return list.map((i) => `- ${i}`);
 }
 
-export function renderMarkdown(plan, issue) {
+export function renderMarkdown(plan, issue, config) {
   const L = [];
   L.push(`# ${plan.title}`, '');
   L.push(`**Test Plan ID:** ${plan.testPlanId}  `);
@@ -143,6 +143,8 @@ export function renderMarkdown(plan, issue) {
     plan.approvals.forEach((a) => L.push(`| ${a.role || 'TBD'} | ${a.name || 'TBD'} |`));
   } else L.push('TBD');
 
-  L.push('', '---', `_Generated from ${plan.sourceIssue} via GROQ (${'openai/gpt-oss-120b'}). Review before use._`);
+  const provider = config?.llm?.active || 'groq';
+  const model = config?.llm?.[provider]?.model || '';
+  L.push('', '---', `_Generated from ${plan.sourceIssue} via ${provider}${model ? ` (${model})` : ''}. Review before use._`);
   return L.join('\n');
 }

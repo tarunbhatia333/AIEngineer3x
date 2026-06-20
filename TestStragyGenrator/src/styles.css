@@ -163,3 +163,67 @@ pre.md {
 }
 
 .foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; }
+
+/* Mode picker */
+.mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 8px; }
+.mode-card {
+  text-align: left; background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; cursor: pointer; color: var(--text); transition: border-color 0.15s;
+}
+.mode-card:hover { border-color: var(--accent); }
+.mode-card h3 { margin: 0 0 6px; font-size: 16px; color: var(--accent); }
+.mode-card p { margin: 0; color: var(--muted); font-size: 13px; }
+
+/* Source toggle */
+.source-pills { display: flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 9px; border: 1px solid var(--border); }
+.source-pills button {
+  background: transparent; color: var(--muted); border: 0; padding: 7px 12px; border-radius: 6px;
+  cursor: pointer; font-size: 13px; font-weight: 600;
+}
+.source-pills button.active { background: var(--accent); color: white; }
+
+/* File drop */
+.file-drop {
+  border: 1.5px dashed var(--border); border-radius: 10px; padding: 18px; text-align: center;
+  color: var(--muted); cursor: pointer; font-size: 13.5px; background: var(--bg);
+}
+.file-drop.drag { border-color: var(--accent); color: var(--accent); }
+
+/* Structured form rows */
+.row-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+.checkbox-field { flex-direction: row; align-items: center; display: flex; gap: 8px; }
+.checkbox-field input { width: auto; }
+textarea, select {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px; color: var(--text);
+  padding: 10px 12px; font-size: 14px; outline: none; font-family: inherit;
+}
+textarea:focus, select:focus { border-color: var(--accent); }
+
+/* Editable table */
+.table-wrap { overflow-x: auto; }
+table.editable textarea {
+  width: 100%; min-width: 140px; border: 0; background: transparent; color: var(--text);
+  resize: vertical; padding: 2px; font-size: 13px;
+}
+
+/* Code viewer */
+.code-files { display: grid; gap: 10px; }
+.code-file { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.code-file-head {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  background: var(--panel-2); border: 0; color: var(--text); padding: 10px 14px;
+  cursor: pointer; font-size: 13.5px; font-weight: 600;
+}
+
+/* Settings provider tabs */
+.provider-tabs { margin: 10px 0 4px; }
+
+/* Test case history suggestions (Test Scripts mode) */
+.history-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.history-card {
+  text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+  padding: 12px 14px; cursor: pointer; color: var(--text); display: grid; gap: 4px; font-size: 13px;
+}
+.history-card strong { color: var(--accent); font-size: 13.5px; }
+.history-card span { color: var(--muted); }
+.history-card.active { border-color: var(--accent); background: var(--panel-2); }

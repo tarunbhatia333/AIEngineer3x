@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchIssue } from './jiraClient.js';
-import { groqChat } from './groqClient.js';
+import { chat } from './llmClient.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -13,7 +13,7 @@ const config = {
   jiraUrl: process.env.JIRA_URL || '',
   jiraEmail: process.env.JIRA_EMAIL || '',
   jiraToken: process.env.JIRA_API_TOKEN || process.env.JIRA_TOKEN || '',
-  groqKey: process.env.GROQ_KEY || '',
+  llm: { active: 'groq', groq: { key: process.env.GROQ_KEY || '' } },
 };
 
 const jiraId = process.argv[2] || 'VWO-48';
@@ -32,7 +32,7 @@ async function main() {
 
   console.log('— GROQ handshake —');
   try {
-    const r = await groqChat(
+    const r = await chat(
       config,
       [{ role: 'user', content: 'Reply with the JSON {"ok":true} and nothing else.' }],
       { json: true, temperature: 0 },
