@@ -99,7 +99,7 @@ async function chatWithRetry(config, messages, opts, maxAttempts = 4) {
 // can't truncate the whole batch: each file either succeeds or fails independently.
 export async function generateTestScripts(config, testCases, options = {}) {
   if (options.oneFile || typeof testCases === 'string' || !Array.isArray(testCases) || testCases.length <= 1) {
-    const text = await chatWithRetry(config, buildMessages(testCases, options, false), { json: false, temperature: 0.3, maxTokens: 6000 });
+    const text = await chatWithRetry(config, buildMessages(testCases, options, false), { json: false, temperature: 0.3, maxTokens: 5000 });
     const files = parseFileBlocks(text);
     if (!files.length) throw new Error('The LLM did not return any recognizable script files');
     return { files };

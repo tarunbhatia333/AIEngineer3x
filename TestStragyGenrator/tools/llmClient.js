@@ -95,7 +95,7 @@ async function anthropicChat(config, messages, { temperature, maxTokens }) {
 
 const PROVIDERS = { groq: groqChat, openai: openaiChat, anthropic: anthropicChat, azureOpenai: azureOpenaiChat };
 
-export async function chat(config, messages, { json = true, temperature = 0.3, maxTokens = 8000 } = {}) {
+export async function chat(config, messages, { json = true, temperature = 0.3, maxTokens = 4096 } = {}) {
   const active = config.llm?.active || 'groq';
   const fn = PROVIDERS[active];
   if (!fn) throw new Error(`Unknown LLM provider: ${active}`);
