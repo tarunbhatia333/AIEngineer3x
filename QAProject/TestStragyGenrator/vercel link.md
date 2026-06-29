@@ -1,1 +1,0 @@
-vercel link: https://blast-jira-testplan.vercel.app/

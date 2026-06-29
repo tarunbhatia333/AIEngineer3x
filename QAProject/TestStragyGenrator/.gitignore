@@ -1,7 +1,0 @@
-node_modules/
-dist/
-.tmp/
-.env
-.vercel/
-output/*.md
-.vercel

@@ -1,0 +1,455 @@
+{
+  "name": "STLC agent",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 2048
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -96,
+        160
+      ],
+      "id": "a18a84c2-6b88-41c3-b813-00a27e23015f",
+      "name": "Google Gemini Chat Model",
+      "notesInFlow": false,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "xSoRLjWv3yt3Ee8j",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        256,
+        160
+      ],
+      "id": "c7b5d53f-4410-4b81-b8bf-25c3ef7143d8",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "xSoRLjWv3yt3Ee8j",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "topK": 32
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        304
+      ],
+      "id": "db83ba96-6f9c-44d6-8bc0-9c9af074b3f6",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "xSoRLjWv3yt3Ee8j",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "topK": 32
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        608,
+        560
+      ],
+      "id": "f4542708-2382-499c-bcf7-78459b77d212",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "xSoRLjWv3yt3Ee8j",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "942d5549-2ba4-4657-9f46-cef792e88236",
+      "name": "Merge All Files",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1248,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "faffff97-a9ca-4d53-a482-a96c14802338",
+              "name": "test_plan",
+              "value": "={{ $binary.data }}",
+              "type": "string"
+            },
+            {
+              "id": "21c35192-2551-4bd2-a29a-6cbe5a493574",
+              "name": "test_cases",
+              "value": "={{ $binary.data }}",
+              "type": "string"
+            },
+            {
+              "id": "de83501c-8d65-46a0-b310-26e09633e4e9",
+              "name": "playwright",
+              "value": "={{ $binary.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "49a75311-1dac-4306-bb84-e65f3fb52674",
+      "name": "Send Files",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1392,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "PRD",
+        "formDescription": "PRD containing test documentation",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "testdetails",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": "pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -400,
+        -64
+      ],
+      "id": "0cabc023-0fd1-46fe-8905-ae0d17c94014",
+      "name": "PRD submission",
+      "webhookId": "6a4f8fdd-483e-4ae5-b5d3-89a0ab6e9bfe"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Analyze the attached PRD document and extract \nall required information as structured JSON.",
+        "options": {
+          "systemMessage": "You are a PRD analyzer. The user has uploaded a PDF \nfile of a Product Requirements Document for VWO \n(Visual Website Optimizer) at https://app.vwo.com/\n\nExtract and return ONLY a valid JSON object with \nthis exact structure. No explanation, no markdown, \nno code fences. Raw JSON only:\n\n{\n  \"product\": \"VWO - Digital Experience Optimization Platform\",\n  \"url\": \"https://app.vwo.com/\",\n  \"modules_and_features\": [\n    {\n      \"module_name\": \"A/B Testing\",\n      \"features\": [\"feature1\", \"feature2\"]\n    }\n  ],\n  \"user_flows\": [\n    \"1. User logs in → navigates to Testing → creates A/B test\",\n    \"2. User accesses Insights → generates heatmap\"\n  ],\n  \"functional_requirements\": [\n    {\"id\": \"FR1\", \"feature\": \"A/B Testing\", \"priority\": \"Must\"},\n    {\"id\": \"FR2\", \"feature\": \"SmartStats Engine\", \"priority\": \"Must\"}\n  ],\n  \"non_functional_requirements\": [\n    {\"category\": \"Performance\", \"requirement\": \"Response within 2 seconds\"},\n    {\"category\": \"Security\", \"requirement\": \"2FA, RBAC, activity logs\"}\n  ],\n  \"acceptance_criteria\": [\n    \"Users can create experiments with multiple variations\",\n    \"Results are statistically validated\"\n  ]\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -176,
+        -64
+      ],
+      "id": "fd62c4ae-854d-4724-95ec-2781a3e4158c",
+      "name": "PRD Fetch Agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "based on the input  generate the test plan Test plan ",
+        "options": {
+          "systemMessage": "\"You are a QA lead. Using the PRD context \nprovided, generate ONLY a test_plan.md file.\nCover all 7 sections: Overview, Objectives,\nScope, Test Types, Environment, Entry/Exit \nCriteria, Risks & Assumptions.\"\n\nInput:  JSON context from Agent 0\nOutput: test_plan.md content only\nTokens: 2048 is enough"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        176,
+        -64
+      ],
+      "id": "212f5b61-953e-4493-ba71-5ec3ab421498",
+      "name": "Test Plan Agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Generate TestCases from testplan input and provide output in csv format",
+        "options": {
+          "systemMessage": "\"You are a QA engineer. Using the test plan,\ngenerate ONLY test_cases.csv with minimum \n40 rows covering all 13 modules.\nfile will contain all the spec file and all the test cases that you are going to create based on the test plan. Valid and invalid test cases for login and dashboard \n\nColumns: Test_Case_ID, Module, Test_Case_Title,\nPreconditions, Test_Steps, Expected_Result,\nPriority, Test_Type, Status\"\nRows: contains testcases serially\nInput:  JSON context from Agent 1\nOutput: test_cases.csv content only\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        480,
+        144
+      ],
+      "id": "fa2cbb1d-ac29-4ac5-a469-624cd1461ede",
+      "name": "Test Case Generator",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Analyze the input and based on that genrate the playright script in markdown format only",
+        "options": {
+          "systemMessage": "\"You are a Senior Automation Engineer.\nUsing the PRD context provided, generate\nPlaywright TypeScript test scripts for all\nHIGH priority test cases.\n\nFormat as markdown with:\n- ## section per VWO module\n- typescript code blocks\n- beforeEach() for login setup:\n  await page.goto('https://app.vwo.com/')\n- Selectors using getByRole(), getByLabel()\n- process.env.VWO_EMAIL and VWO_PASSWORD\n  for credentials\n- Comment each test with TC_ID\n\nReturn markdown only.\""
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        784,
+        160
+      ],
+      "id": "99ff0449-da6f-4fc0-b138-a681cb10ab25",
+      "name": "Test scripts Playright"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "output",
+        "options": {
+          "fileName": "testplan.md"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        944,
+        -256
+      ],
+      "id": "cf5b4647-0d75-499d-8cea-2823aa3b4232",
+      "name": "Testplan File"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "output",
+        "options": {
+          "fileName": "testcases.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        -64
+      ],
+      "id": "6d31fad8-7c3a-4834-b741-7f563e08412b",
+      "name": "Testcases File"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "output",
+        "options": {
+          "fileName": "playwright_scripts.md"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        112
+      ],
+      "id": "75a6a64d-c040-434b-946b-170ad39de14a",
+      "name": "Testscripts file"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "PRD Fetch Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Test Plan Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Test Case Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Test scripts Playright",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Files": {
+      "main": [
+        [
+          {
+            "node": "Send Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PRD submission": {
+      "main": [
+        [
+          {
+            "node": "PRD Fetch Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PRD Fetch Agent": {
+      "main": [
+        [
+          {
+            "node": "Test Plan Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Plan Agent": {
+      "main": [
+        [
+          {
+            "node": "Testplan File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Test Case Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Case Generator": {
+      "main": [
+        [
+          {
+            "node": "Testcases File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Test scripts Playright",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test scripts Playright": {
+      "main": [
+        [
+          {
+            "node": "Testscripts file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testplan File": {
+      "main": [
+        [
+          {
+            "node": "Merge All Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testcases File": {
+      "main": [
+        [
+          {
+            "node": "Merge All Files",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Testscripts file": {
+      "main": [
+        [
+          {
+            "node": "Merge All Files",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a4925ad4-9bb8-4768-b987-7f77ffa78a7c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "764b7415428d35dfcd0fc16a4c1aa10fca85a8ad07ae5d27d1d0ce9eb7c11874"
+  },
+  "nodeGroups": [],
+  "id": "EAArLPwFofuBLuI7",
+  "tags": []
+}
