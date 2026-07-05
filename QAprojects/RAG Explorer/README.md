@@ -21,6 +21,71 @@ Ollama/Chroma path still works exactly as before for local dev. The OpenAI/Pinec
 path was added so it can also run as a real deployment on Vercel, where a local
 Ollama process and a local Chroma server aren't reachable.
 
+**Live demo:** https://rag-explorer-five.vercel.app
+
+## What this is
+
+RAG Explorer is a teaching/demo tool for **Retrieval-Augmented Generation** — it
+answers questions about a document by first *retrieving* the most relevant passages
+and then asking an LLM to *generate* an answer grounded in only those passages,
+instead of the LLM answering from memory alone. The point of the app is to make
+every step of that process **visible**, not hidden behind a single "Ask" button.
+
+**What it does, in short:**
+1. Takes a source document (a bundled default PDF, or one you upload — PDF/.txt/.md).
+2. Splits it into overlapping text chunks and turns each chunk into a vector
+   embedding (a list of numbers capturing its meaning).
+3. Stores those embeddings in a vector database.
+4. When you ask a question, it embeds the question the same way, finds the
+   chunks whose embeddings are most similar (nearest-neighbor search), and shows
+   you those chunks with their similarity scores *before* answering.
+5. Sends the question + retrieved chunks to an LLM, which writes the final answer
+   using only that retrieved context.
+6. A pipeline stepper animates through each of these stages live as a query runs,
+   so you can see ingestion and retrieval happening rather than just getting a
+   black-box chat response.
+
+You can switch the active knowledge base between the default document and any
+file you upload, each ingested into its own isolated collection/namespace.
+
+## Architecture
+
+```
+ Frontend (React + Vite)
+   PipelineStepper · UploadPanel · ChatPanel · RetrievedChunks · AnswerPanel
+             │
+             │  HTTP  /api/*  (JSON)
+             ▼
+ Backend (FastAPI)
+   routers/
+     ingest.py       — upload a file, or re-ingest the default PDF
+     query.py        — embed question → retrieve → call LLM → return answer
+     collections.py  — list / activate / delete knowledge-base collections
+             │
+             ▼
+   chunking.py  →  embeddings.py  →  vectorstore.py  →  llm.py
+             │             │               │              │
+             ▼             ▼               ▼              ▼
+      PDF/txt/md     Embeddings       Vector store       Groq
+      → chunks     Ollama (local)   Chroma (local)    LLM API
+                    OpenAI (cloud)   Pinecone (cloud)  (answer gen.)
+```
+
+**Request flow for a query:**
+`question → embed(question) → nearest-neighbor search in vector store → top-K
+chunks (shown in UI with scores) → chunks + question sent to Groq → answer (shown
+separately from the chunks)`
+
+**Request flow for ingestion (default doc or upload):**
+`PDF/txt/md → extract text per page → split into overlapping chunks → embed each
+chunk → upsert (id, embedding, {text, source, page}) into the vector store under
+a collection/namespace`
+
+**Two deployment targets, same code:** `backend/app/config.py` picks the
+embeddings + vector-store provider automatically based on whether the `VERCEL`
+env var is set (Vercel sets it for you) — see the table above. Everything else
+(chunking, routers, frontend) is identical between local dev and production.
+
 ## Requirements
 
 - Python 3.10+
