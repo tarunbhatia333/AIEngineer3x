@@ -1,14 +1,25 @@
-# RAG Explorer (Local-First)
+# RAG Explorer
 
 A full-stack RAG (Retrieval-Augmented Generation) explorer that visually walks through
-the entire pipeline — **PDF/Upload → Chunking → Embedding → ChromaDB Storage →
-Retrieval → LLM Answer** — running entirely on your machine.
+the entire pipeline — **PDF/Upload → Chunking → Embedding → Vector Storage →
+Retrieval → LLM Answer**.
 
 - **Frontend:** React + Vite
 - **Backend:** Python FastAPI
-- **Vector DB:** ChromaDB (local, persistent to `./chroma-data`)
-- **Embeddings:** `nomic-embed-text` via local Ollama
 - **LLM:** Groq (`openai/gpt-oss-120b`)
+
+Ships with two interchangeable backends for embeddings + vector storage, picked
+automatically based on environment (or overridden via env vars):
+
+| | Local dev (default) | Vercel / production (default) |
+|---|---|---|
+| Embeddings | `nomic-embed-text` via local Ollama | OpenAI `text-embedding-3-small` |
+| Vector store | ChromaDB (local server, persists to `./chroma-data`) | Pinecone (serverless index, auto-created) |
+
+This project started as a strictly local-first app (see `prompt/prompt.md`); the
+Ollama/Chroma path still works exactly as before for local dev. The OpenAI/Pinecone
+path was added so it can also run as a real deployment on Vercel, where a local
+Ollama process and a local Chroma server aren't reachable.
 
 ## Requirements
 
@@ -77,36 +88,76 @@ Open the printed URL (default `http://localhost:5173`).
 4. **Reset** — delete an uploaded collection with the ✕ button, or re-ingest the
    default PDF at any time.
 
+## Deploying to Vercel
+
+The frontend (static build) and backend (a single Python serverless function at
+`api/index.py`) deploy together as one Vercel project — `vercel.json` builds the
+Vite app and rewrites `/api/*` to the Python function, so they share an origin
+(no CORS to configure).
+
+1. Set these **Environment Variables** in the Vercel project (Settings → Environment Variables):
+   - `GROQ_API_KEY`
+   - `OPENAI_API_KEY`
+   - `PINECONE_API_KEY`
+   - (optional) `PINECONE_INDEX`, `PINECONE_CLOUD`, `PINECONE_REGION` — defaults are `rag-explorer` / `aws` / `us-east-1`.
+   - Vercel sets `VERCEL=1` automatically, which is what switches the app to the
+     OpenAI/Pinecone providers — you don't need to set `EMBEDDINGS_PROVIDER` /
+     `VECTORSTORE_PROVIDER` yourself.
+2. Deploy from the project root (`RAG Explorer/`):
+   ```bash
+   npx vercel --prod
+   ```
+   The first deploy creates the Pinecone index automatically (dimension 1536,
+   cosine metric) if it doesn't exist yet.
+3. On first request, the backend auto-ingests the default PDF into Pinecone (skipped
+   on subsequent cold starts once it's already populated — see `ingest_default()`
+   in `backend/app/ingest.py`).
+
+Uploads on Vercel are processed in a temp directory scoped to that invocation —
+they're chunked/embedded/stored in Pinecone immediately, not kept as persistent files
+(unlike local dev, where they're saved under `uploads/`).
+
 ## Configuration
 
 All runtime config lives in `backend/.env` (copy from `backend/.env.example`).
-Only `GROQ_API_KEY` is required — everything else has a sensible default:
+For local dev, only `GROQ_API_KEY` is required — everything else has a sensible default:
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `GROQ_API_KEY` | *(required)* | Groq API key |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq chat model |
+| `EMBEDDINGS_PROVIDER` | `ollama` locally, `openai` on Vercel | `ollama` or `openai` |
+| `VECTORSTORE_PROVIDER` | `chroma` locally, `pinecone` on Vercel | `chroma` or `pinecone` |
 | `OLLAMA_URL` | `http://localhost:11434` | Local Ollama server |
 | `EMBED_MODEL` | `nomic-embed-text` | Ollama embedding model |
 | `CHROMA_URL` | `http://localhost:8010` | Local Chroma server |
+| `OPENAI_API_KEY` | *(required on Vercel)* | OpenAI API key |
+| `OPENAI_EMBED_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
+| `PINECONE_API_KEY` | *(required on Vercel)* | Pinecone API key |
+| `PINECONE_INDEX` | `rag-explorer` | Pinecone index name (auto-created) |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `1200` / `200` | Chunking parameters |
 | `TOP_K` | `4` | Chunks retrieved per query |
-| `PORT` | `8787` | Backend port |
+| `PORT` | `8787` | Backend port (local dev only) |
 
 ## Project layout
 
 ```
 RAG Explorer/
 ├── data/                 # default source PDF(s)
-├── uploads/              # user-uploaded files
-├── chroma-data/          # Chroma's persistent storage (gitignored)
+├── uploads/              # user-uploaded files (local dev only)
+├── chroma-data/          # Chroma's persistent storage (gitignored, local dev only)
+├── api/
+│   └── index.py          # Vercel serverless entrypoint (imports backend/main.py's app)
+├── vercel.json            # builds frontend + rewrites /api/* to api/index.py
+├── requirements.txt        # lean deps for the Vercel function (fastapi, pinecone, ...)
 ├── backend/
 │   ├── main.py           # FastAPI app entrypoint
+│   ├── requirements.txt  # full local-dev deps (adds chromadb, uvicorn)
 │   └── app/
-│       ├── config.py
+│       ├── config.py     # picks providers based on VERCEL env var
 │       ├── chunking.py   # PDF/txt parsing + overlapping chunk splitting
-│       ├── embeddings.py # Ollama embedding calls
-│       ├── vectorstore.py# Chroma client wrapper
+│       ├── embeddings.py # Ollama (local) or OpenAI (cloud) embedding calls
+│       ├── vectorstore.py# Chroma (local) or Pinecone (cloud) client wrapper
 │       ├── llm.py        # Groq chat completion call
 │       ├── ingest.py     # chunk → embed → store pipeline
 │       ├── state.py      # active-collection tracking
@@ -114,7 +165,7 @@ RAG Explorer/
 └── frontend/
     └── src/
         ├── App.jsx
-        ├── api.js
+        ├── api.js         # same-origin in prod, localhost:8787 in dev
         └── components/   # PipelineStepper, UploadPanel, ChatPanel, ...
 ```
 
@@ -127,3 +178,6 @@ RAG Explorer/
 - **Groq errors** — check `GROQ_API_KEY` is set in `backend/.env` and valid.
 - **Empty retrieval / "No chunks found"** — ingest a document first (the default
   PDF ingests automatically on backend startup; check the backend console for errors).
+- **"OPENAI_API_KEY is not set"** (Vercel) — set it in the project's Environment Variables.
+- **"PINECONE_API_KEY is not set" or index errors** (Vercel) — set `PINECONE_API_KEY`;
+  the index is created automatically on first use.

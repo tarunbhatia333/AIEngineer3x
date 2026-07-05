@@ -4,6 +4,7 @@ from .. import config, vectorstore
 from ..embeddings import EmbeddingError, embed_query
 from ..llm import LLMError, generate_answer
 from ..schemas import QueryRequest, QueryResponse, RetrievedChunk
+from ..vectorstore import VectorStoreError
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
@@ -20,22 +21,11 @@ async def run_query(req: QueryRequest):
     except EmbeddingError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    result = vectorstore.query(req.collection, query_embedding, top_k)
-
-    chunks: list[RetrievedChunk] = []
-    documents = result["documents"][0]
-    metadatas = result["metadatas"][0]
-    distances = result["distances"][0]
-    for doc, meta, dist in zip(documents, metadatas, distances):
-        chunks.append(
-            RetrievedChunk(
-                text=doc,
-                source=meta.get("source", "unknown"),
-                page=meta.get("page", 0),
-                index=meta.get("index", 0),
-                score=round(1 - dist, 4),
-            )
-        )
+    try:
+        results = vectorstore.query(req.collection, query_embedding, top_k)
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    chunks = [RetrievedChunk(**r) for r in results]
 
     if not chunks:
         raise HTTPException(

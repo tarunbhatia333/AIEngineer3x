@@ -22,7 +22,11 @@ async def ingest_file(path: str, source: str, collection_name: str, label: str) 
     return len(chunks)
 
 
-async def ingest_default() -> int:
+async def ingest_default(force: bool = False) -> int:
+    if not force and vectorstore.collection_count(config.DEFAULT_COLLECTION) > 0:
+        state.set_meta(config.DEFAULT_COLLECTION, "Default (VWO PRD)", config.DEFAULT_PDF_NAME)
+        return vectorstore.collection_count(config.DEFAULT_COLLECTION)
+
     path = config.DATA_DIR / config.DEFAULT_PDF_NAME
     if not path.exists():
         return 0

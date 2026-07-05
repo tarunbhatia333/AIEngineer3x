@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from .. import config, ingest, state
 from ..embeddings import EmbeddingError
 from ..schemas import IngestResult
+from ..vectorstore import VectorStoreError
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
@@ -17,8 +18,8 @@ def _slugify(name: str) -> str:
 @router.post("/default", response_model=IngestResult)
 async def reingest_default():
     try:
-        count = await ingest.ingest_default()
-    except EmbeddingError as exc:
+        count = await ingest.ingest_default(force=True)
+    except (EmbeddingError, VectorStoreError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if count == 0:
         raise HTTPException(
@@ -42,7 +43,7 @@ async def upload_and_ingest(file: UploadFile = File(...)):
     collection_name = f"{config.UPLOAD_COLLECTION_PREFIX}-{_slugify(file.filename)}-{int(time.time())}"
     try:
         count = await ingest.ingest_file(str(dest_path), file.filename, collection_name, file.filename)
-    except EmbeddingError as exc:
+    except (EmbeddingError, VectorStoreError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     if count == 0:

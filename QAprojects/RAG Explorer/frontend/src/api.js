@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8787";
+// In production (Vercel), the frontend and API share an origin (see vercel.json
+// rewrites), so a relative "" base is correct. In local dev, the Vite server
+// (5173) and FastAPI (8787) are separate origins, so default to localhost.
+const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.PROD ? "" : "http://localhost:8787");
 
 async function handle(res) {
   if (!res.ok) {
