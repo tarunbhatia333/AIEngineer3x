@@ -1,0 +1,29 @@
+# Env / secrets
+backend/.env
+.env
+
+# Python
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.venv/
+*.pyc
+
+# Node
+frontend/node_modules/
+node_modules/
+frontend/dist/
+
+# Local data
+chroma-data/
+uploads/*
+!uploads/.gitkeep
+
+# Editors / OS
+.vscode/
+.DS_Store
+
+# Vercel
+.vercel/
+
+.vercel
+.env*
