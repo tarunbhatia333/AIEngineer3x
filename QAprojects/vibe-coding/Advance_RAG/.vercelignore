@@ -1,0 +1,14 @@
+# Secrets — never upload local env files
+.env
+.env.local
+.env*.local
+keys_private.md
+
+# Local dev artifacts not needed (or not writable) in the serverless deployment
+.venv
+venv
+__pycache__
+**/__pycache__
+chroma_data
+app.log
+requirements-local.txt

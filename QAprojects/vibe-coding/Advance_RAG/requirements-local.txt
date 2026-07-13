@@ -1,0 +1,14 @@
+# Local dev install: `pip install -r requirements-local.txt`
+# Everything Vercel needs (requirements.txt) plus the local vector store and
+# local model backends used when MODEL_PROFILE=light (the default off-Vercel).
+-r requirements.txt
+
+chromadb>=0.5
+sentence-transformers>=3.0
+
+# --- optional: full profile (MODEL_PROFILE=full) ---
+# Only needed if you flip MODEL_PROFILE to "full" in config.py to use the
+# real bge-m3 (~2.3GB) + BAAI/bge-reranker-v2-m3 (~570MB) models instead of
+# the lightweight swap-ins. Uncomment and re-run pip install:
+# FlagEmbedding>=1.2
+# torch>=2.2

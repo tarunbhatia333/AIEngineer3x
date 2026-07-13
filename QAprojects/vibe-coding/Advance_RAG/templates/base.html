@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Advance RAG Explorer{% endblock %}</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">RAG</div>
+      <div>
+        <div class="brand-title">Advance RAG Explorer</div>
+        <div class="brand-sub">The Testing Academy &middot; VWO test cases</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="/upload" class="nav-link {% if request.path == '/upload' or request.path == '/' %}active{% endif %}">
+        <span class="nav-num">1</span> Upload &amp; Ingest
+      </a>
+      <a href="/chunks" class="nav-link {% if request.path == '/chunks' %}active{% endif %}">
+        <span class="nav-num">2</span> Chunk Explorer
+      </a>
+      <a href="/chat" class="nav-link {% if request.path == '/chat' %}active{% endif %}">
+        <span class="nav-num">3</span> Chat
+      </a>
+    </nav>
+
+    <div class="tracker" id="stage-tracker">
+      <div class="tracker-title">Pipeline</div>
+      <ol class="tracker-list" id="tracker-list">
+        {% block tracker_stages %}
+        <li class="stage" data-stage="idle"><span class="dot"></span>Idle</li>
+        {% endblock %}
+      </ol>
+    </div>
+
+    <div class="sidebar-footer">
+      <span class="badge">model profile: {{ model_profile or 'light' }}</span>
+    </div>
+  </aside>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

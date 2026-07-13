@@ -1,0 +1,487 @@
+<title>How the Advance RAG Explorer Thinks</title>
+<meta name="description" content="An annotated walkthrough of a hybrid-retrieval RAG pipeline built for VWO QA test cases: dense + sparse search, RRF fusion, reranking, query rewriting, and generation.">
+
+<style>
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+
+  :root {
+    --paper: #ECEEE6;
+    --paper-raised: #F7F8F2;
+    --ink: #1F2421;
+    --ink-dim: #5B6259;
+    --rule: #D3D6C9;
+    --dense: #2B6F77;
+    --dense-soft: #DCEBE9;
+    --sparse: #B0632E;
+    --sparse-soft: #F1E3D3;
+    --fused: #8C7A34;
+    --fused-soft: #EDE7CE;
+    --code-bg: #1F2421;
+    --code-text: #ECEEE6;
+    --shadow: 0 1px 2px rgba(31,36,33,0.06), 0 6px 20px rgba(31,36,33,0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171A17;
+      --paper-raised: #1F2320;
+      --ink: #E7E9E1;
+      --ink-dim: #9AA192;
+      --rule: #333831;
+      --dense: #6FC2C9;
+      --dense-soft: #1E3A3C;
+      --sparse: #D98A4E;
+      --sparse-soft: #3A2A1C;
+      --fused: #C9B76A;
+      --fused-soft: #3A331C;
+      --code-bg: #0E100D;
+      --code-text: #E7E9E1;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 6px 24px rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #171A17; --paper-raised: #1F2320; --ink: #E7E9E1; --ink-dim: #9AA192; --rule: #333831;
+    --dense: #6FC2C9; --dense-soft: #1E3A3C; --sparse: #D98A4E; --sparse-soft: #3A2A1C;
+    --fused: #C9B76A; --fused-soft: #3A331C; --code-bg: #0E100D; --code-text: #E7E9E1;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 6px 24px rgba(0,0,0,0.3);
+  }
+  :root[data-theme="light"] {
+    --paper: #ECEEE6; --paper-raised: #F7F8F2; --ink: #1F2421; --ink-dim: #5B6259; --rule: #D3D6C9;
+    --dense: #2B6F77; --dense-soft: #DCEBE9; --sparse: #B0632E; --sparse-soft: #F1E3D3;
+    --fused: #8C7A34; --fused-soft: #EDE7CE; --code-bg: #1F2421; --code-text: #ECEEE6;
+    --shadow: 0 1px 2px rgba(31,36,33,0.06), 0 6px 20px rgba(31,36,33,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.62;
+  }
+  h1, h2, h3 {
+    font-family: Georgia, "Iowan Old Style", "Sitka Text", Charter, serif;
+    font-weight: 600;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+  a { color: var(--dense); }
+  code, .mono, .stat-num { font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace; }
+  ::selection { background: var(--fused-soft); }
+  :focus-visible { outline: 2px solid var(--dense); outline-offset: 2px; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    padding: 64px 24px 40px;
+    text-align: center;
+    border-bottom: 1px solid var(--rule);
+  }
+  .hero-eyebrow {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 14px;
+  }
+  .hero h1 { font-size: clamp(28px, 4.4vw, 46px); margin: 0 auto 16px; max-width: 16ch; }
+  .hero p.lede { max-width: 56ch; margin: 0 auto 32px; color: var(--ink-dim); font-size: 17px; }
+  canvas#wave { width: 100%; max-width: 720px; height: 140px; display: block; margin: 0 auto; }
+  .wave-legend { display: flex; justify-content: center; gap: 22px; margin-top: 10px; font-size: 12.5px; color: var(--ink-dim); flex-wrap: wrap; }
+  .wave-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  /* ---------- layout ---------- */
+  .layout { display: flex; align-items: flex-start; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  nav.toc {
+    position: sticky; top: 32px; width: 210px; flex-shrink: 0;
+    padding: 40px 20px 40px 0; font-size: 13px; display: none;
+  }
+  nav.toc a {
+    display: block; color: var(--ink-dim); text-decoration: none; padding: 5px 0;
+    border-left: 2px solid transparent; padding-left: 12px; margin-left: -13px;
+  }
+  nav.toc a.active { color: var(--dense); border-left-color: var(--dense); font-weight: 600; }
+  @media (min-width: 920px) { nav.toc { display: block; } }
+
+  main { flex: 1; min-width: 0; padding: 48px 0 100px; }
+  section { max-width: 680px; margin: 0 0 64px; scroll-margin-top: 24px; }
+  section.wide { max-width: 100%; }
+  .kicker {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+    font-size: 12px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  section h2 { font-size: 26px; margin: 0 0 18px; }
+  section h3 { font-size: 18px; margin: 28px 0 10px; }
+  p { margin: 0 0 16px; }
+  .lead { font-size: 18px; color: var(--ink-dim); }
+  ul, ol { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+
+  .card {
+    background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 12px;
+    padding: 20px 24px; box-shadow: var(--shadow); margin: 20px 0;
+  }
+  .scroll-x { overflow-x: auto; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-dim); font-weight: 600; }
+  td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px;
+    padding: 2px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper);
+  }
+  .pill.dense { color: var(--dense); border-color: color-mix(in srgb, var(--dense) 40%, var(--rule)); background: var(--dense-soft); }
+  .pill.sparse { color: var(--sparse); border-color: color-mix(in srgb, var(--sparse) 40%, var(--rule)); background: var(--sparse-soft); }
+  .pill.fused { color: var(--fused); border-color: color-mix(in srgb, var(--fused) 40%, var(--rule)); background: var(--fused-soft); }
+
+  /* pipeline flow diagram */
+  .flow { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 6px 2px 14px; }
+  .flow-node {
+    flex-shrink: 0; width: 148px; border: 1px solid var(--rule); background: var(--paper-raised);
+    border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow);
+  }
+  .flow-node .n { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-dim); }
+  .flow-node .t { font-weight: 600; font-size: 13.5px; margin: 4px 0 6px; }
+  .flow-node .d { font-size: 11.5px; color: var(--ink-dim); line-height: 1.4; }
+  .flow-arrow { flex-shrink: 0; width: 30px; display: flex; align-items: center; justify-content: center; color: var(--ink-dim); font-size: 16px; }
+
+  /* code block */
+  pre {
+    background: var(--code-bg); color: var(--code-text); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 16px 0;
+  }
+  .diff-add { color: #8FD19E; } .diff-del { color: #E39A9A; text-decoration: line-through; }
+
+  /* comparison table basic vs advance */
+  .compare-yes { color: var(--dense); } .compare-no { color: var(--ink-dim); }
+
+  /* rrf worked example */
+  .rrf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+  .rrf-card { border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; background: var(--paper-raised); }
+  .rrf-card .chunk-name { font-weight: 600; font-size: 13.5px; margin-bottom: 6px; }
+  .rrf-card .row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 2px 0; }
+  .rrf-card .final { border-top: 1px solid var(--rule); margin-top: 6px; padding-top: 6px; font-weight: 700; color: var(--fused); }
+
+  /* architecture listing */
+  .filelist { font-size: 13.5px; }
+  .filelist .row { display: flex; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+  .filelist .row:last-child { border-bottom: none; }
+  .filelist .f { font-family: ui-monospace, monospace; color: var(--dense); flex-shrink: 0; width: 190px; }
+  .filelist .desc { color: var(--ink-dim); }
+
+  .callout {
+    border-left: 3px solid var(--sparse); background: var(--sparse-soft); border-radius: 0 10px 10px 0;
+    padding: 14px 18px; font-size: 14.5px; color: var(--ink);
+  }
+  .callout.security { border-left-color: var(--sparse); }
+  .callout strong { color: var(--sparse); }
+
+  footer { text-align: center; padding: 30px 24px 60px; color: var(--ink-dim); font-size: 13px; }
+
+  .reveal { opacity: 0; transform: translateY(10px); transition: opacity 0.5s ease, transform 0.5s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+</style>
+
+<div class="hero">
+  <div class="hero-eyebrow">The Testing Academy &middot; Advance RAG Explorer</div>
+  <h1>Two signals, fused, then re-judged.</h1>
+  <p class="lede">
+    A walkthrough of how this app turns a folder of VWO test cases into a system that can
+    answer questions and draft new test cases &mdash; grounded, cited, and built to be read like an
+    engineering notebook, not a black box.
+  </p>
+  <canvas id="wave" width="720" height="140" role="img" aria-label="Animated diagram of a dense semantic wave and a sparse lexical signal merging into a fused ranking"></canvas>
+  <div class="wave-legend">
+    <span><i class="swatch" style="background:var(--dense)"></i>dense &middot; semantic embedding</span>
+    <span><i class="swatch" style="background:var(--sparse)"></i>sparse &middot; lexical (TF-IDF)</span>
+    <span><i class="swatch" style="background:var(--fused)"></i>fused &middot; Reciprocal Rank Fusion</span>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+    <a href="#why" data-toc>Why upgrade at all</a>
+    <a href="#stage1" data-toc>Stage 1 &middot; Ingest</a>
+    <a href="#hybrid" data-toc>Dense + sparse, fused</a>
+    <a href="#stage2" data-toc>Stage 2 &middot; Chat</a>
+    <a href="#profile" data-toc>Model profile</a>
+    <a href="#map" data-toc>Code map</a>
+    <a href="#security" data-toc>A note on secrets</a>
+  </nav>
+
+  <main>
+
+    <section id="why">
+      <div class="kicker">01 &middot; Why upgrade at all</div>
+      <h2>A basic RAG answers. This one shows its work.</h2>
+      <p class="lead">A minimal RAG demo embeds text, searches a vector store, and asks an LLM to answer. That works until your corpus stops being three sample paragraphs &mdash; at real scale (thousands of QA test cases with IDs, priorities, JIRA links) the gaps show up fast: keyword-exact queries miss semantically-phrased chunks and vice versa, the top match isn't always the best match, and one phrasing of a question can miss chunks a slightly different phrasing would have found.</p>
+
+      <div class="scroll-x">
+      <table>
+        <thead><tr><th>Concern</th><th>Basic RAG</th><th>This build</th></tr></thead>
+        <tbody>
+          <tr><td>Retrieval</td><td class="compare-no">single dense vector search</td><td class="compare-yes">dense + sparse, fused with RRF</td></tr>
+          <tr><td>Ranking</td><td class="compare-no">trusts raw similarity order</td><td class="compare-yes">cross-encoder reranks the fused candidates</td></tr>
+          <tr><td>Query</td><td class="compare-no">embeds exactly what the user typed</td><td class="compare-yes">Groq rewrites 3 alternate phrasings first</td></tr>
+          <tr><td>Filtering</td><td class="compare-no">none</td><td class="compare-yes">metadata filters (priority / module / jira_id)</td></tr>
+          <tr><td>Transparency</td><td class="compare-no">answer only</td><td class="compare-yes">every intermediate ranking is inspectable in the UI</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="stage1" class="wide reveal">
+      <div class="kicker">02 &middot; Stage 1</div>
+      <h2>Ingest: five steps from spreadsheet to searchable index</h2>
+      <p>Every row of an uploaded CSV/XLSX becomes one document; each document becomes one or more chunks; each chunk gets two independent representations before it lands in the store.</p>
+
+      <div class="flow scroll-x">
+        <div class="flow-node"><div class="n">01</div><div class="t">Read</div><div class="d">pandas parses the file, reports row/column counts</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">02</div><div class="t">Build docs</div><div class="d">chosen text columns concatenated as <code>label: value</code>; chosen metadata columns kept as-is</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">03</div><div class="t">Chunk</div><div class="d">1 row = 1 chunk under 1000 chars, else split with 150-char overlap</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">04</div><div class="t">Embed</div><div class="d">dense vector (bge-small / bge-m3) + sparse TF-IDF weights, in batches</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">05</div><div class="t">Index</div><div class="d">upsert into Chroma's persistent collection <code>vwo_test_cases</code></div></div>
+      </div>
+
+      <h3>Why the overlap matters</h3>
+      <p style="max-width:680px">Most test cases here are short enough to stay as a single chunk. When one doesn't fit, splitting it blind would risk cutting "3. Click Publish" from its own expected result on the next chunk. The 150-character overlap means both halves keep enough of the boundary sentence to stand alone as a retrieval unit.</p>
+    </section>
+
+    <section id="hybrid" class="reveal">
+      <div class="kicker">03 &middot; The core idea</div>
+      <h2>Two rankings almost never agree &mdash; that disagreement is the signal</h2>
+      <p>A <span class="pill dense">dense</span> embedding finds chunks that mean the same thing as the query, even with zero shared words. A <span class="pill sparse">sparse</span> TF-IDF vector finds chunks that share the query's exact vocabulary &mdash; a JIRA ID, an error string, a UI label &mdash; which dense embeddings routinely blur together. Neither ranking is "the" ranking. <strong>Reciprocal Rank Fusion</strong> combines them without needing their scores to be on the same scale: it only looks at each list's <em>rank order</em>.</p>
+
+      <div class="card">
+        <div style="font-family:ui-monospace,monospace;font-size:13.5px;text-align:center;margin-bottom:4px">RRF(chunk) = &Sigma; 1 / (k + rank)</div>
+        <div style="text-align:center;font-size:12px;color:var(--ink-dim)">summed over every ranked list the chunk appears in &middot; k = 60 in this build</div>
+      </div>
+
+      <h3>Worked example</h3>
+      <p>Two chunks, two rankings. Chunk A wins on meaning; Chunk B wins on wording &mdash; and also shows up, second-best, on meaning. Fusion rewards the chunk both signals partially agree on:</p>
+      <div class="rrf-grid">
+        <div class="rrf-card">
+          <div class="chunk-name">Chunk A</div>
+          <div class="row"><span class="pill dense">dense rank</span><span>1st</span></div>
+          <div class="row"><span class="pill sparse">sparse rank</span><span>3rd</span></div>
+          <div class="row final">RRF = 1/61 + 1/63 = 0.0323</div>
+        </div>
+        <div class="rrf-card">
+          <div class="chunk-name">Chunk B</div>
+          <div class="row"><span class="pill dense">dense rank</span><span>2nd</span></div>
+          <div class="row"><span class="pill sparse">sparse rank</span><span>1st</span></div>
+          <div class="row final">RRF = 1/62 + 1/61 = 0.0325</div>
+        </div>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-dim)">Chunk B edges ahead &mdash; despite never being the single best match on either signal alone. In <code>vectorstore.py</code>, <code>rrf_fuse()</code> does exactly this over as many ranked lists as you hand it, which matters for the next section.</p>
+
+      <div class="callout" style="border-left-color:var(--dense);background:var(--dense-soft)">
+        <strong>Why Chroma changes the sparse half.</strong> Qdrant stores native sparse vectors alongside dense ones in the same point. OSS Chroma doesn't &mdash; so <code>sparse_index.py</code> hand-rolls a small TF-IDF inverted index that lives beside the Chroma collection and gets queried in parallel. Same fusion math, different plumbing underneath.
+      </div>
+    </section>
+
+    <section id="stage2" class="wide reveal">
+      <div class="kicker">04 &middot; Stage 2</div>
+      <h2>Chat: a real transcript from this build</h2>
+      <p style="max-width:680px">Everything below is an actual response from the running app (light model profile, 15-row sample corpus) for the question <em>"how do I test URL targeting rules?"</em> &mdash; not a mockup.</p>
+
+      <div class="flow scroll-x">
+        <div class="flow-node"><div class="n">01</div><div class="t">Rewrite</div><div class="d">Groq drafts 3 alternate phrasings of the question</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">02</div><div class="t">Embed &amp; search</div><div class="d">all 4 phrasings (original + 3) searched dense + sparse</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">03</div><div class="t">RRF fuse</div><div class="d">8 ranked lists combined into 1 fused ranking</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">04</div><div class="t">Rerank</div><div class="d">cross-encoder re-scores the fused top-20 candidates</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node"><div class="n">05</div><div class="t">Generate</div><div class="d">Groq streams a cited answer from the top 4</div></div>
+      </div>
+
+      <h3>Step 1 &middot; the rewrites Groq actually produced</h3>
+      <ol>
+        <li><em>"how do I test URL targeting rules?"</em> (original)</li>
+        <li>"What is the process for validating URL targeting rules in A/B testing?"</li>
+        <li>"How can I ensure that my URL targeting rules are correctly applied in VWO?"</li>
+        <li>"What are the steps to test and verify the functionality of URL targeting rules in A/B testing experiments?"</li>
+      </ol>
+
+      <h3>Step 4 &middot; rerank before/after</h3>
+      <div class="scroll-x">
+      <table>
+        <thead><tr><th class="num">Fused rank</th><th class="num">Rerank rank</th><th>Chunk</th><th class="num">Cross-encoder score</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td class="num">1</td><td>TC-006 &middot; Verify URL targeting rule with 'contains' condition</td><td class="num">8.12</td></tr>
+          <tr><td class="num">2</td><td class="num">2</td><td>TC-007 &middot; Verify audience targeting by device type</td><td class="num">&minus;2.23</td></tr>
+          <tr><td class="num">3</td><td class="num">3</td><td>TC-001 &middot; Verify A/B test creation with two variations</td><td class="num">&minus;6.64</td></tr>
+          <tr><td class="num">5</td><td class="num">4</td><td>TC-013 &middot; Verify multi-variant test supports up to 8 variations</td><td class="num">&minus;8.43</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-dim)">Note fused-rank 4 (TC-002, a negative/validation test) dropped out entirely &mdash; the reranker judged the actual candidate-vs-query pair, not just embedding proximity, and pulled fused-rank-5 up past it instead.</p>
+
+      <h3>Step 5 &middot; the streamed, cited answer</h3>
+      <div class="card">
+        "To test URL targeting rules, you can follow the steps outlined in <strong>[Chunk 1]</strong>. This involves creating a new campaign, adding a URL targeting condition (specifically 'contains /checkout'), saving, and then previewing the campaign on a checkout page to verify that it triggers only on URLs containing '/checkout' and does not trigger on other pages."
+      </div>
+
+      <h3>The other mode: generate</h3>
+      <p style="max-width:680px">The same pipeline runs for <em>"create a new test case for JIRA VWO-2050 about testing multi-page funnel targeting"</em> &mdash; <code>generation.py</code>'s <code>detect_mode()</code> flips to <strong>Generate</strong>, and retrieved test cases become style templates rather than facts to cite:</p>
+      <div class="card" style="font-size:14px">
+        <strong>Title:</strong> Verify Multi-Page Funnel Targeting Triggers Campaign Correctly<br>
+        <strong>Preconditions:</strong> VWO account with campaign creation permissions, multi-page funnel rule configured <span class="pill">Chunk 4</span><br>
+        <strong>Steps:</strong> 1. Create campaign, navigate to Targeting <span class="pill">Chunk 4</span> &middot; 2. Set funnel URLs per step <span class="pill">Chunk 4</span> &middot; 3. Save &amp; preview each page <span class="pill">Chunk 4</span><br>
+        <strong>Expected:</strong> Triggers only after the full funnel sequence <span class="pill">Chunk 2</span><br>
+        <strong>Priority:</strong> High &middot; <strong>Tags:</strong> targeting;funnel-rules;multi-page
+      </div>
+    </section>
+
+    <section id="profile" class="reveal">
+      <div class="kicker">05 &middot; An honest tradeoff</div>
+      <h2>Two model profiles behind one interface</h2>
+      <p>The original spec called for <code>bge-m3</code> (2.3GB) and <code>bge-reranker-v2-m3</code> (570MB). Those are real, and wired up &mdash; but they're not the default, because a demo that takes ten minutes to cold-start on a laptop teaches worse than one that runs immediately.</p>
+      <div class="scroll-x">
+      <table>
+        <thead><tr><th>Profile</th><th>Dense embedder</th><th>Reranker</th><th>Footprint</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill fused">light</span> default</td><td>BAAI/bge-small-en-v1.5</td><td>ms-marco-MiniLM-L-6-v2</td><td class="num">~220MB</td></tr>
+          <tr><td>full</td><td>BAAI/bge-m3</td><td>BAAI/bge-reranker-v2-m3</td><td class="num">~2.9GB</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink-dim)">Both profiles implement the exact same <code>.encode()</code> / <code>.score()</code> interface (<code>embeddings.py</code>, <code>reranker.py</code>), so switching is one line in <code>.env</code>: <code>MODEL_PROFILE=full</code>.</p>
+    </section>
+
+    <section id="map" class="wide reveal">
+      <div class="kicker">06 &middot; Code map</div>
+      <h2>Where each idea on this page actually lives</h2>
+      <div class="card filelist">
+        <div class="row"><div class="f">chunking.py</div><div class="desc">doc assembly, overlap-aware splitting, histogram stats</div></div>
+        <div class="row"><div class="f">sparse_index.py</div><div class="desc">the hand-rolled TF-IDF inverted index standing in for native sparse vectors</div></div>
+        <div class="row"><div class="f">embeddings.py</div><div class="desc">dense embedder, light/full swap behind one interface</div></div>
+        <div class="row"><div class="f">reranker.py</div><div class="desc">cross-encoder reranker, same light/full pattern</div></div>
+        <div class="row"><div class="f">vectorstore.py</div><div class="desc">Chroma wrapper: upsert, dense/sparse search, <code>rrf_fuse()</code>, rerank</div></div>
+        <div class="row"><div class="f">query_rewrite.py</div><div class="desc">Groq call that drafts the 3 alternate phrasings</div></div>
+        <div class="row"><div class="f">generation.py</div><div class="desc">mode detection, prompt construction, streamed Groq generation</div></div>
+        <div class="row"><div class="f">ingest.py</div><div class="desc">Stage 1 orchestration, both as an SSE generator and a CLI</div></div>
+        <div class="row"><div class="f">app.py</div><div class="desc">Flask pages + JSON/SSE endpoints tying it all together</div></div>
+      </div>
+    </section>
+
+    <section id="security" class="reveal">
+      <div class="kicker">07 &middot; Before you share this anywhere</div>
+      <h2>One thing worth fixing before this repo goes further</h2>
+      <div class="callout security">
+        <strong>keys_private.md, sitting beside this file, holds live plaintext API keys</strong> (Pinecone, OpenAI &times;2, Groq, Vercel). It wasn't tracked by git when this project was built, and <code>.gitignore</code> now excludes it and <code>.env</code> explicitly &mdash; but a plaintext key file in a project folder is exactly the kind of thing that gets swept up by a future <code>git add -A</code>. Worth moving those keys into a password manager and rotating the ones that have ever been pasted into a chat, an issue, or a doc.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  Built for The Testing Academy &middot; see <code>README.md</code> in this folder to run it yourself.
+</footer>
+
+<script>
+(function () {
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // hero canvas: dense sine wave + sparse discrete bars merging toward a fused line
+  var canvas = document.getElementById("wave");
+  var ctx = canvas.getContext("2d");
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  function size() {
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  size();
+  window.addEventListener("resize", size);
+
+  var styles = getComputedStyle(document.documentElement);
+  function col(name) { return styles.getPropertyValue(name).trim(); }
+
+  var t = 0;
+  function frame() {
+    var w = canvas.getBoundingClientRect().width;
+    var h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0, 0, w, h);
+
+    var denseCol = col("--dense"), sparseCol = col("--sparse"), fusedCol = col("--fused");
+    var midY = h * 0.52;
+
+    // dense: smooth continuous wave (upper band)
+    ctx.beginPath();
+    for (var x = 0; x <= w; x += 4) {
+      var y = midY - 30 - Math.sin(x * 0.028 + t) * 14;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = denseCol; ctx.lineWidth = 2.2; ctx.stroke();
+
+    // sparse: discrete bars (lower band), sparse on purpose
+    ctx.fillStyle = sparseCol;
+    for (var bx = 10; bx < w; bx += 26) {
+      var phase = Math.sin(bx * 0.15 + t * 1.3);
+      if (phase > 0.15) {
+        var bh = 10 + phase * 20;
+        ctx.fillRect(bx, midY + 40 - bh, 6, bh);
+      }
+    }
+
+    // fused: midline that thickens where both signals agree (visual metaphor, not literal data)
+    ctx.beginPath();
+    for (var fx = 0; fx <= w; fx += 4) {
+      var fy = midY + 6 + Math.sin(fx * 0.028 + t) * 5;
+      fx === 0 ? ctx.moveTo(fx, fy) : ctx.lineTo(fx, fy);
+    }
+    ctx.strokeStyle = fusedCol; ctx.lineWidth = 3; ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
+
+    if (!reduced) {
+      t += 0.018;
+      requestAnimationFrame(frame);
+    }
+  }
+  frame();
+
+  // scroll-spy for the table of contents
+  var sections = document.querySelectorAll("main section[id]");
+  var links = document.querySelectorAll('nav.toc a[data-toc]');
+  var byId = {};
+  links.forEach(function (l) { byId[l.getAttribute("href").slice(1)] = l; });
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      var link = byId[entry.target.id];
+      if (!link) return;
+      if (entry.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove("active"); });
+        link.classList.add("active");
+      }
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach(function (s) { io.observe(s); });
+
+  // reveal-on-scroll
+  var revealEls = document.querySelectorAll(".reveal");
+  if (reduced) {
+    revealEls.forEach(function (el) { el.classList.add("in"); });
+  } else {
+    var rio = new IntersectionObserver(function (entries, obs) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) { entry.target.classList.add("in"); obs.unobserve(entry.target); }
+      });
+    }, { threshold: 0.1 });
+    revealEls.forEach(function (el) { rio.observe(el); });
+  }
+})();
+</script>

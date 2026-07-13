@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Chunk Explorer &middot; Advance RAG Explorer{% endblock %}
+
+{% block tracker_stages %}
+<li class="stage done" data-stage="browse"><span class="dot"></span>Browsing collection</li>
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">3. Chunk Explorer</h1>
+<p class="page-sub">Every chunk currently in the Chroma collection, with its dense/sparse preview. Chunks outlined in coral were cited in your most recent chat answer.</p>
+
+<div class="card">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input type="search" id="search" placeholder="Search chunk text…" style="flex:1;min-width:200px">
+    <input type="text" id="filter-priority" placeholder="priority">
+    <input type="text" id="filter-module" placeholder="module">
+    <input type="text" id="filter-jira" placeholder="jira_id">
+    <button class="btn secondary" id="apply-filters">Apply</button>
+  </div>
+</div>
+
+<div id="chunk-list"></div>
+<div class="pagination" id="pagination"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let page = 1;
+const pageSize = 50;
+
+async function loadChunks() {
+  const params = new URLSearchParams({
+    page, page_size: pageSize,
+    search: document.getElementById("search").value,
+    priority: document.getElementById("filter-priority").value,
+    module: document.getElementById("filter-module").value,
+    jira_id: document.getElementById("filter-jira").value,
+  });
+  const resp = await fetch(`/api/chunks?${params}`);
+  const data = await resp.json();
+  render(data);
+}
+
+function render(data) {
+  const listEl = document.getElementById("chunk-list");
+  if (!data.chunks.length) {
+    listEl.innerHTML = `<div class="card"><p class="empty-state">No chunks match. ${data.total === 0 ? 'Have you run ingestion yet? <a href="/ingest">Go ingest &rarr;</a>' : ''}</p></div>`;
+    document.getElementById("pagination").innerHTML = "";
+    return;
+  }
+
+  listEl.innerHTML = data.chunks.map((c) => {
+    const cited = data.last_citations.includes(c.id);
+    const metaPills = Object.entries(c.metadata || {})
+      .filter(([k, v]) => v)
+      .map(([k, v]) => `<span class="pill">${escapeHtml(k)}: ${escapeHtml(v)}</span>`).join("");
+    return `
+      <div class="chunk-card ${cited ? "cited" : ""}">
+        <div class="chunk-id">${escapeHtml(c.id)} ${cited ? '<span class="pill weight">cited in last answer</span>' : ""}</div>
+        <div style="margin-top:4px">${metaPills}</div>
+        <div class="chunk-text">${escapeHtml(c.text)}</div>
+      </div>`;
+  }).join("");
+
+  const totalPages = Math.max(1, Math.ceil(data.total / data.page_size));
+  document.getElementById("pagination").innerHTML = `
+    <button class="btn secondary" ${page <= 1 ? "disabled" : ""} id="prev-page">&larr; Prev</button>
+    <span>Page ${page} / ${totalPages} &middot; ${data.total} chunks</span>
+    <button class="btn secondary" ${page >= totalPages ? "disabled" : ""} id="next-page">Next &rarr;</button>
+  `;
+  document.getElementById("prev-page")?.addEventListener("click", () => { page--; loadChunks(); });
+  document.getElementById("next-page")?.addEventListener("click", () => { page++; loadChunks(); });
+}
+
+document.getElementById("apply-filters").addEventListener("click", () => { page = 1; loadChunks(); });
+document.getElementById("search").addEventListener("keydown", (e) => { if (e.key === "Enter") { page = 1; loadChunks(); } });
+
+loadChunks();
+</script>
+{% endblock %}

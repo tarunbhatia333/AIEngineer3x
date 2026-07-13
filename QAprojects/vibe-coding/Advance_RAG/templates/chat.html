@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Chat &middot; Advance RAG Explorer{% endblock %}
+
+{% block content %}
+<h1 class="page-title">4. Chat</h1>
+<p class="page-sub">Collection <span class="pill">{{ collection.name }}</span> has <strong>{{ collection.count }}</strong> chunks. Ask a question, or say "create a new test case for JIRA VWO-1234" to switch to Generate mode.</p>
+
+<div class="chat-log" id="chat-log"></div>
+<div class="chat-input-row">
+  <input type="text" id="chat-input" placeholder="Ask about the test cases…" autocomplete="off">
+  <button class="btn" id="send-btn">Send</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+renderTracker([
+  { key: "rewrite", label: "Rewrite query" },
+  { key: "retrieve", label: "Hybrid retrieve" },
+  { key: "rerank", label: "Rerank" },
+  { key: "generate", label: "Generate" },
+]);
+
+const log = document.getElementById("chat-log");
+const input = document.getElementById("chat-input");
+const sendBtn = document.getElementById("send-btn");
+
+function mdLite(text) {
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[Chunk (\d+)\]/g, '<span class="cite" data-n="$1">[Chunk $1]</span>')
+    .replace(/\n/g, "<br>");
+}
+
+function addUserMessage(text) {
+  const div = document.createElement("div");
+  div.className = "msg user";
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addAssistantMessage() {
+  const wrap = document.createElement("div");
+  wrap.className = "msg assistant";
+  wrap.innerHTML = `<div class="answer"></div><div class="detail-toggle">Show pipeline detail ▾</div><div class="detail-panel"></div>`;
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+  return wrap;
+}
+
+function fmtList(items, scoreKey) {
+  if (!items.length) return '<p class="empty-state" style="padding:8px 0">none</p>';
+  return `<table><thead><tr><th>#</th><th>chunk</th><th>score</th><th>preview</th></tr></thead><tbody>` +
+    items.map((it, i) => `<tr><td>${i + 1}</td><td class="mono">${escapeHtml(it.id)}</td><td>${it[scoreKey]}</td><td>${escapeHtml((it.text || "").slice(0, 70))}…</td></tr>`).join("") +
+    `</tbody></table>`;
+}
+
+function fmtRerank(chunks) {
+  if (!chunks.length) return '<p class="empty-state" style="padding:8px 0">none</p>';
+  return `<table><thead><tr><th>before</th><th>after</th><th>chunk</th><th>rerank score</th></tr></thead><tbody>` +
+    chunks.map((c) => `<tr><td>${c.before_rank}</td><td>${c.after_rank}</td><td class="mono">${escapeHtml(c.id)}</td><td>${c.rerank_score}</td></tr>`).join("") +
+    `</tbody></table>`;
+}
+
+async function send() {
+  const query = input.value.trim();
+  if (!query) return;
+  input.value = "";
+  sendBtn.disabled = true;
+  addUserMessage(query);
+  const msgEl = addAssistantMessage();
+  const answerEl = msgEl.querySelector(".answer");
+  const detailEl = msgEl.querySelector(".detail-panel");
+  msgEl.querySelector(".detail-toggle").addEventListener("click", (e) => {
+    detailEl.classList.toggle("open");
+    e.target.textContent = detailEl.classList.contains("open") ? "Hide pipeline detail ▴" : "Show pipeline detail ▾";
+  });
+
+  ["rewrite", "retrieve", "rerank", "generate"].forEach((k) => setStageStatus(k, ""));
+  setStageStatus("rewrite", "active");
+  let rerankedChunks = [];
+
+  await streamSSE("/api/chat/stream", { query }, {
+    rewrite: (d) => {
+      setStageStatus("rewrite", "done");
+      setStageStatus("retrieve", "active");
+      detailEl.innerHTML += `<h3 style="margin:0 0 8px;font-size:12.5px">Query rewrites</h3><ul style="margin:0 0 14px;padding-left:18px">${d.queries.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>`;
+    },
+    retrieve: (d) => {
+      setStageStatus("retrieve", "done");
+      setStageStatus("rerank", "active");
+      detailEl.innerHTML += `
+        <h3 style="margin:14px 0 8px;font-size:12.5px">Dense top-${d.dense.length}</h3>${fmtList(d.dense, "score")}
+        <h3 style="margin:14px 0 8px;font-size:12.5px">Sparse top-${d.sparse.length}</h3>${fmtList(d.sparse, "score")}
+        <h3 style="margin:14px 0 8px;font-size:12.5px">RRF-fused top-${d.fused.length}</h3>${fmtList(d.fused, "score")}
+      `;
+    },
+    rerank: (d) => {
+      setStageStatus("rerank", "done");
+      setStageStatus("generate", "active");
+      rerankedChunks = d.chunks;
+      detailEl.innerHTML += `<h3 style="margin:14px 0 8px;font-size:12.5px">Rerank before/after (cross-encoder)</h3>${fmtRerank(d.chunks)}`;
+    },
+    mode: (d) => {
+      detailEl.innerHTML += `<p style="margin-top:10px"><span class="pill weight">mode: ${d.mode}</span></p>`;
+    },
+    token: (d) => {
+      answerEl.dataset.raw = (answerEl.dataset.raw || "") + d.delta;
+      answerEl.innerHTML = mdLite(answerEl.dataset.raw);
+      log.scrollTop = log.scrollHeight;
+    },
+    done: () => {
+      setStageStatus("generate", "done");
+      answerEl.querySelectorAll(".cite").forEach((el) => {
+        el.addEventListener("click", () => {
+          detailEl.classList.add("open");
+          msgEl.querySelector(".detail-toggle").textContent = "Hide pipeline detail ▴";
+          detailEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      });
+      sendBtn.disabled = false;
+    },
+    error: (d) => {
+      answerEl.innerHTML = `<span style="color:#C0503E">Error: ${escapeHtml(d.message)}</span>`;
+      sendBtn.disabled = false;
+    },
+  });
+}
+
+sendBtn.addEventListener("click", send);
+input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+</script>
+{% endblock %}

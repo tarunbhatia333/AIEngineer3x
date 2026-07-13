@@ -1,0 +1,16 @@
+# Installed by Vercel for the serverless deployment (see api/index.py,
+# vercel.json) — kept deliberately slim since a Vercel Python function has a
+# hard bundle-size limit that torch/sentence-transformers/chromadb would blow
+# straight through. Local dev installs requirements-local.txt instead, which
+# layers the heavier local-model packages on top of this same file.
+
+flask>=3.0
+python-dotenv>=1.0
+pandas>=2.0
+openpyxl>=3.1
+groq>=0.9
+numpy>=1.26
+
+# --- hosted providers used when IS_SERVERLESS (config.py) ---
+openai>=1.40
+pinecone>=5.4

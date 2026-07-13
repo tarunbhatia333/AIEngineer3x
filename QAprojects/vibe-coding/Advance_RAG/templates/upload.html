@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Upload &amp; Ingest &middot; Advance RAG Explorer{% endblock %}
+
+{% block content %}
+<h1 class="page-title">1. Upload &amp; Ingest</h1>
+<p class="page-sub">CSV or XLSX of VWO test cases. After upload, pick which columns get embedded (text) vs kept as filterable metadata, then start ingestion.</p>
+
+<div class="card">
+  <div class="upload-drop" id="drop-zone">
+    <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none">
+    <div id="drop-label">
+      <strong>Click to choose a file</strong><br>
+      <span style="font-size:12px">.csv &middot; .xlsx &middot; .xls</span>
+      {% if filename %}<div style="margin-top:10px" class="pill">last used: {{ filename }}</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div id="preview-section" style="display:none">
+  <div class="card">
+    <h3><span class="stage-tag">Preview</span><span id="preview-filename"></span></h3>
+    <p style="color:var(--text-dim);font-size:12.5px" id="preview-summary"></p>
+    <div style="overflow-x:auto"><table id="preview-table"></table></div>
+  </div>
+
+  <div class="card">
+    <h3><span class="stage-tag">Columns</span>Text columns (embedded into each chunk)</h3>
+    <div class="checkbox-grid" id="text-col-grid"></div>
+    <h3 style="margin-top:18px"><span class="stage-tag">Columns</span>Metadata columns (kept as filterable payload)</h3>
+    <div class="checkbox-grid" id="meta-col-grid"></div>
+    <div style="margin-top:18px">
+      <button class="btn" id="start-btn" disabled>Start Ingestion</button>
+    </div>
+  </div>
+</div>
+
+<div id="stage-cards"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+renderTracker([
+  { key: "read", label: "Read" },
+  { key: "build_docs", label: "Build docs" },
+  { key: "chunk", label: "Chunk" },
+  { key: "embed", label: "Embed" },
+  { key: "index", label: "Index" },
+]);
+
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
+let currentFile = null;
+let allColumns = [];
+const textSelected = new Set();
+const metaSelected = new Set();
+
+dropZone.addEventListener("click", () => fileInput.click());
+["dragover", "dragleave", "drop"].forEach((evt) => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.toggle("drag", evt === "dragover");
+  });
+});
+dropZone.addEventListener("drop", (e) => {
+  if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length) uploadFile(fileInput.files[0]);
+});
+
+async function uploadFile(file) {
+  currentFile = file;
+  const form = new FormData();
+  form.append("file", file);
+  document.getElementById("drop-label").innerHTML = "Uploading &hellip;";
+  const resp = await fetch("/api/upload", { method: "POST", body: form });
+  const data = await resp.json();
+  if (!resp.ok) {
+    document.getElementById("drop-label").innerHTML = `<span style="color:#C0503E">${escapeHtml(data.error)}</span>`;
+    return;
+  }
+  renderPreview(data);
+}
+
+function renderPreview(data) {
+  document.getElementById("drop-label").innerHTML = `<strong>${escapeHtml(data.filename)}</strong> uploaded`;
+  document.getElementById("preview-section").style.display = "block";
+  document.getElementById("preview-filename").textContent = data.filename;
+  document.getElementById("preview-summary").textContent =
+    `${data.rows} rows · ${data.columns.length} columns`;
+
+  allColumns = data.columns;
+
+  const table = document.getElementById("preview-table");
+  const dtypeRow = data.columns.map((c) => `<td class="mono" style="color:var(--text-dim)">${escapeHtml(data.dtypes[c])}</td>`).join("");
+  const headerRow = data.columns.map((c) => `<th>${escapeHtml(c)}</th>`).join("");
+  const bodyRows = data.head.map((row) =>
+    `<tr>${data.columns.map((c) => `<td>${escapeHtml(String(row[c]).slice(0, 60))}</td>`).join("")}</tr>`
+  ).join("");
+  table.innerHTML = `<thead><tr>${headerRow}</tr><tr>${dtypeRow}</tr></thead><tbody>${bodyRows}</tbody>`;
+
+  document.getElementById("stage-cards").innerHTML = "";
+  renderColumnChips();
+}
+
+function renderColumnChips() {
+  textSelected.clear();
+  metaSelected.clear();
+  const textGrid = document.getElementById("text-col-grid");
+  const metaGrid = document.getElementById("meta-col-grid");
+  textGrid.innerHTML = allColumns.map((c) => chipHtml(c, "text")).join("");
+  metaGrid.innerHTML = allColumns.map((c) => chipHtml(c, "meta")).join("");
+
+  textGrid.querySelectorAll(".chip-check").forEach((chip) => chip.addEventListener("click", () => toggleChip(chip, textSelected, "checked-text")));
+  metaGrid.querySelectorAll(".chip-check").forEach((chip) => chip.addEventListener("click", () => toggleChip(chip, metaSelected, "checked-meta")));
+}
+
+function chipHtml(col, group) {
+  return `<label class="chip-check" data-col="${escapeHtml(col)}" data-group="${group}"><input type="checkbox">${escapeHtml(col)}</label>`;
+}
+
+function toggleChip(chip, selectedSet, activeClass) {
+  const col = chip.dataset.col;
+  const input = chip.querySelector("input");
+  if (selectedSet.has(col)) {
+    selectedSet.delete(col);
+    input.checked = false;
+    chip.classList.remove(activeClass);
+  } else {
+    selectedSet.add(col);
+    input.checked = true;
+    chip.classList.add(activeClass);
+  }
+  document.getElementById("start-btn").disabled = textSelected.size === 0;
+}
+
+const cardsEl = document.getElementById("stage-cards");
+let embedPreviewHtml = "";
+
+function stageCard(key, title) {
+  let card = document.getElementById(`card-${key}`);
+  if (!card) {
+    card = document.createElement("div");
+    card.className = "card";
+    card.id = `card-${key}`;
+    card.innerHTML = `<h3><span class="stage-tag">${title}</span></h3><div class="card-body"></div>`;
+    cardsEl.appendChild(card);
+  }
+  return card.querySelector(".card-body");
+}
+
+document.getElementById("start-btn").addEventListener("click", async () => {
+  if (!currentFile) return;
+  const btn = document.getElementById("start-btn");
+  btn.disabled = true;
+  btn.textContent = "Ingesting…";
+  cardsEl.innerHTML = "";
+  embedPreviewHtml = "";
+  ["read", "build_docs", "chunk", "embed", "index"].forEach((k) => setStageStatus(k, ""));
+  setStageStatus("read", "active");
+
+  const form = new FormData();
+  form.append("file", currentFile);
+  form.append("text_cols", [...textSelected].join(","));
+  form.append("meta_cols", [...metaSelected].join(","));
+
+  await streamSSE("/api/ingest/stream", form, {
+    read: (d) => {
+      setStageStatus("read", "done");
+      setStageStatus("build_docs", "active");
+      stageCard("read", "Read").innerHTML =
+        `<p><strong>${d.rows}</strong> rows &middot; <strong>${d.columns.length}</strong> columns: <span class="mono">${d.columns.join(", ")}</span></p>`;
+    },
+    build_docs: (d) => {
+      setStageStatus("build_docs", "done");
+      setStageStatus("chunk", "active");
+      stageCard("build_docs", "Build docs").innerHTML =
+        `<p><strong>${d.doc_count}</strong> documents assembled from text columns <span class="mono">${d.text_cols.join(", ")}</span>, metadata <span class="mono">${d.meta_cols.join(", ") || "(none)"}</span></p>
+         <p style="color:var(--text-dim);font-size:12px">Sample:</p>
+         <div class="chunk-text">${escapeHtml(d.sample)}</div>`;
+    },
+    chunk: (d) => {
+      setStageStatus("chunk", "done");
+      setStageStatus("embed", "active");
+      const maxCount = Math.max(...d.histogram.map((h) => h.count), 1);
+      const histHtml = d.histogram.map((h) =>
+        `<div class="histogram-bar" style="height:${Math.max(8, (h.count / maxCount) * 100)}%"><span>${h.count}</span></div>`
+      ).join("");
+      const samplesHtml = d.samples.map((s) =>
+        `<div class="chunk-card"><div class="chunk-id">${s.id} <span class="pill">${s.char_len} chars</span></div><div class="chunk-text">${escapeHtml(s.text)}</div></div>`
+      ).join("");
+      let overlapHtml = "";
+      if (d.overlap_sample) {
+        overlapHtml = `<p style="font-size:12px;color:var(--text-dim);margin-top:12px">Overlap example (<span class="overlap-highlight">highlighted chars repeat</span> between adjacent chunks of the same doc):</p>
+          <div class="chunk-card"><div class="chunk-id">${d.overlap_sample.id}</div><div class="chunk-text">${escapeHtml(d.overlap_sample.text)}</div></div>`;
+      }
+      stageCard("chunk", "Chunk").innerHTML = `
+        <p><strong>${d.total}</strong> chunks &middot; avg ${d.avg_chars} chars &middot; min ${d.min_chars} &middot; max ${d.max_chars}</p>
+        <div class="histogram">${histHtml}</div>
+        <p style="font-size:12px;color:var(--text-dim);margin-top:10px">Samples:</p>
+        ${samplesHtml}
+        ${overlapHtml}
+      `;
+    },
+    embed: (d) => {
+      setStageStatus("embed", "active");
+      if (d.preview) {
+        const dims = d.preview.dense_dims_shown.map((v) => v.toFixed(3)).join(", ");
+        const sparseHtml = Object.entries(d.preview.sparse_top5)
+          .map(([tok, w]) => `<span class="pill weight">${escapeHtml(tok)}: ${w.toFixed(2)}</span>`)
+          .join("");
+        embedPreviewHtml = `
+          <p style="font-size:12px;color:var(--text-dim);margin-top:10px">Dense preview (first 8 / ${d.preview.dense_total_dims} dims, chunk ${d.preview.example_chunk_id}):</p>
+          <div class="mono chunk-text">[${dims}, ...]</div>
+          <p style="font-size:12px;color:var(--text-dim);margin-top:10px">Sparse top-5 tokens by weight:</p>
+          <div>${sparseHtml}</div>
+        `;
+      }
+      stageCard("embed", "Embed").innerHTML = `
+        <p>${d.done} / ${d.total} chunks embedded (${d.progress_pct}%)</p>
+        <div class="progress-bar"><div class="progress-bar-fill" style="width:${d.progress_pct}%"></div></div>
+        ${embedPreviewHtml}
+      `;
+    },
+    index: (d) => {
+      setStageStatus("embed", "done");
+      setStageStatus("index", "done");
+      stageCard("index", "Index").innerHTML = `
+        <p>Collection <span class="pill">${d.name}</span> now has <strong>${d.count}</strong> chunks.</p>
+        <p style="font-size:12px;color:var(--text-dim)">Store: <span class="mono">${escapeHtml(d.path)}</span></p>
+        <p style="margin-top:10px"><a href="/chunks">Open the Chunk Explorer &rarr;</a> &middot; <a href="/chat">Start chatting &rarr;</a></p>
+      `;
+    },
+    done: () => {
+      btn.textContent = "Re-run Ingestion";
+      btn.disabled = false;
+    },
+    error: (d) => {
+      setStageStatus("embed", "error");
+      cardsEl.insertAdjacentHTML("beforeend", `<div class="card"><p style="color:#C0503E">Error: ${escapeHtml(d.message)}</p></div>`);
+      btn.disabled = false;
+      btn.textContent = "Retry Ingestion";
+    },
+  });
+});
+</script>
+{% endblock %}
